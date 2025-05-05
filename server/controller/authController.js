@@ -1,27 +1,27 @@
 import User from "../models/userSchema.js";
 import bcrypt from "bcryptjs";
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
-import { sendEmail } from "../mails/email.js";
-const register = async (req,res) => {
+import { sendEmail, sendResetSuccessfullEmail, sendPasswordResetEmail } from "../mails/email.js";
+const register = async (req, res) => {
     try {
-        const {fullName,email,password,confirmPassword,phoneNumber} = req.body;
-        const requiredFields = ["fullName","email","password","confirmPassword","phoneNumber"];
+        const { fullName, email, password, confirmPassword, phoneNumber } = req.body;
+        const requiredFields = ["fullName", "email", "password", "confirmPassword", "phoneNumber"];
         const missingFields = requiredFields.filter(field => !req.body[field]);
-        if(missingFields.length > 0) {
-            return res.status(400).json({message:`Please provide ${missingFields.join(", ")}`});
+        if (missingFields.length > 0) {
+            return res.status(400).json({ message: `Please provide ${missingFields.join(", ")}` });
         }
 
-        const existingUser = await User.findOne({email});
-        if(existingUser) {
-            return res.status(400).json({message:"User already exists"});
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ message: "User already exists" });
         }
-        const existingPhoneNumber = await User.findOne({phoneNumber});
-        if(existingPhoneNumber) {
-            return res.status(400).json({message:"Phone number already exists"});
+        const existingPhoneNumber = await User.findOne({ phoneNumber });
+        if (existingPhoneNumber) {
+            return res.status(400).json({ message: "Phone number already exists" });
         }
         const hashedPassowrd = await bcrypt.hash(password, 10);
-        if(!hashedPassowrd) {
-            return res.status(500).json({message:"Error hashing password"});
+        if (!hashedPassowrd) {
+            return res.status(500).json({ message: "Error hashing password" });
         }
 
 
@@ -30,52 +30,136 @@ const register = async (req,res) => {
         const user = new User({
             fullName,
             email,
-            password:hashedPassowrd,
+            password: hashedPassowrd,
             phoneNumber,
             verificationToken
         });
 
         await user.save();
-        generateTokenAndSetCookie(user,res);
-        await sendEmail(email,verificationToken,fullName);
-        return res.status(201).json({message:"User registered successfully",user});
+        generateTokenAndSetCookie(user, res);
+        await sendEmail(email, verificationToken, fullName);
+        return res.status(201).json({ message: "User registered successfully", user });
     } catch (error) {
-        
+
     }
 }
 
-const login = async(req,res) => {
+const login = async (req, res) => {
     try {
-        const {email,password} = req.body;
-        const requiredFields = ["email","password"];
+        const { email, password } = req.body;
+        const requiredFields = ["email", "password"];
         const missingFields = requiredFields.filter(field => !req.body[field]);
-        if(missingFields.length > 0) {
-            return res.status(400).json({message:`Please provide ${missingFields.join(", ")}`});
+        if (missingFields.length > 0) {
+            return res.status(400).json({ message: `Please provide ${missingFields.join(", ")}` });
         }
-        const user = await User.findOne({email}).select("-password");
-        if(!user) {
-            return res.status(401).json({message:"Invalid email or password"});
+        const user = await User.findOne({ email }).select("-password");
+        if (!user) {
+            return res.status(401).json({ message: "Invalid email or password" });
         }
         const isMatch = await bcrypt.compare(password, user.password);
-        if(!isMatch) {
-            return res.status(401).json({message:"Invalid email or password"});
+        if (!isMatch) {
+            return res.status(401).json({ message: "Invalid email or password" });
         }
-        generateTokenAndSetCookie(user,res);
-         res.status(200).json({message:"User logged in successfully",user});
+        generateTokenAndSetCookie(user, res);
+        res.status(200).json({ message: "User logged in successfully", user });
     } catch (error) {
-        res.status(500).json({message:"Internal server error"});
+        res.status(500).json({ message: "Internal server error" });
     }
 }
 
-const forgetPassord = async(req,res) => {
+const verifyEmail = async (req, res) => {
     try {
-        const {email}= req.body;
-            
+
+
+        const { code } = req.body;
+        if (!code) return res.status(403).json({ success: false, message: "Verification code is required" });
+
+        const user = await User.findOne({
+            verificationToken: { $exists: true },
+            verificationTokenExpiresDate: { $gte: Date.now() }
+        });
+
+        if (!user) return res.status(403).json({ sucess: false, message: "Token Expired" });
+
+        const isMatch = await bcrypt.compare(code, user.verificationToken);
+        if (!isMatch) return res.status(403).json({ success: false, message: "Invalid Token" })
+
+        user.isVerified = true;
+        user.verificationTokenExpiresDate = undefined;
+        user.verificationToken = undefined;
+        await user.save();
+        res.status(200).json({ success: true, message: "User Verified" })
     } catch (error) {
-        
+        res.status(500).json({ message: "Internal server error" });
     }
 }
 
-export  {register,login};
+
+const forgetPassord = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(401).json({ message: "Email is required" });
+        }
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(401).json({ message: "User not found" });
+        }
+
+        const resetPasswordToken = crypto.randomBytes(32).toString("hex");
+        const resetPasswordExpiresDate = Date.now() + 3600000;
+
+        user.resetPasswordToken = resetPasswordToken;
+        user.resetPasswordExpiresDate = resetPasswordExpiresDate;
+        await user.save();
+        await sendPasswordResetEmail(email, user.fullName, `${process.env.CLIENT_URL}/reset-password/${resetPasswordToken}`);
+        res.status(200).json({ success: true, message: `Reset Password sent to ${email}` });
+    } catch (error) {
+        res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+const resetPassword = async (req, res) => {
+
+    try {
+        const { token } = req.params;
+        const { password } = req.body;
+
+        if (!token || !password) {
+            return res.status(400).json({ message: "Token and password are required" });
+        }
+
+        const user = await User.findOne({ resetPasswordToken: token, resetPasswordExpiresDate: { $gt: Date.now() } });
+        if (!user) {
+            return res.status(401).json({ message: "Invalid or expired token" });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        if (!hashedPassword) {
+            return res.status(500).json({ message: "Error hashing password" });
+        }
+        user.password = hashedPassword;
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpiresDate = undefined;
+
+        await user.save();
+        await sendResetSuccessfullEmail(user.email);
+    }
+    catch (error) {
+        res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+export const logout  = async(req,res) => {
+    try {
+        res.clearCookie("token");
+        res.status(200).json({ message: "User logged out successfully" });
+    } catch (error) {
+        res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+export { register, login, forgetPassord, resetPassword,verifyEmail,logout };
 
 
