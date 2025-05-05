@@ -1,0 +1,104 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 122 65% 24%; /* Deep green */
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 43 97% 58%; /* Warm yellow */
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 122 30% 95%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 33 90% 55%; /* Orange */
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 122 65% 24%;
+
+    --radius: 0.6rem;
+
+    --sidebar-background: 122 65% 24%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 122 65% 24%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 43 97% 58%;
+    --sidebar-accent-foreground: 122 65% 24%;
+    --sidebar-border: 122 30% 15%;
+    --sidebar-ring: 122 65% 24%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 122 65% 24%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 43 97% 58%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 33 90% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 43 97% 58%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom styles */
+.kolekto-gradient {
+  background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%);
+}
+
+.kolekto-card {
+  @apply border border-border bg-card text-card-foreground shadow-sm rounded-xl overflow-hidden;
+}
+
+.kolekto-input {
+  @apply flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.kolekto-button {
+  @apply inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+}
