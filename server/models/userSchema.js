@@ -1,9 +1,9 @@
 import mongoose from "mongoose";
 import validator from "validator";
+import bcrypt from "bcryptjs";
 
 
-
-const phoneRegex = /^(?:\+88)?01[3-9]\d{8}$/;
+const phoneRegex = /^(?:\+234|0)[789][01]\d{8}$/; 
 const userSchema = new mongoose.Schema({
     fullName:{
         type:String,
@@ -29,13 +29,8 @@ const userSchema = new mongoose.Schema({
     },
     confirmPassword:{
         type:String,
-        required:[true, "Please Provide Your Password"],
-        validate:{
-            validator:function(v){
-                return v === this.password
-            },
-            message:(props) => `${props.value} is not the same as password!`
-        }
+        required:[true, "Please Provide Your Password"]
+
     },
     phoneNumber:{
         type:String,
@@ -67,5 +62,13 @@ const userSchema = new mongoose.Schema({
     verificationTokenExpiresDate:Date
 },{timestamps:true});
 
+
+userSchema.pre('save', async function(next) {
+    if (this.isModified('password')) {
+      this.password = await bcrypt.hash(this.password, 10);
+    }
+    this.confirmPassword = undefined;
+    next();
+  });
 const User = mongoose.model("User", userSchema);
 export default User;

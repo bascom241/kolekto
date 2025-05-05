@@ -5,6 +5,7 @@ import { sendEmail, sendResetSuccessfullEmail, sendPasswordResetEmail } from "..
 const register = async (req, res) => {
     try {
         const { fullName, email, password, confirmPassword, phoneNumber } = req.body;
+        console.log(req.body);
         const requiredFields = ["fullName", "email", "password", "confirmPassword", "phoneNumber"];
         const missingFields = requiredFields.filter(field => !req.body[field]);
         if (missingFields.length > 0) {
@@ -15,6 +16,7 @@ const register = async (req, res) => {
         if (existingUser) {
             return res.status(400).json({ message: "User already exists" });
         }
+        console.log(2, existingUser);
         const existingPhoneNumber = await User.findOne({ phoneNumber });
         if (existingPhoneNumber) {
             return res.status(400).json({ message: "Phone number already exists" });
@@ -31,16 +33,21 @@ const register = async (req, res) => {
             fullName,
             email,
             password: hashedPassowrd,
+            confirmPassword,
             phoneNumber,
             verificationToken
         });
 
+        console.log(3,user)
+
         await user.save();
         generateTokenAndSetCookie(user, res);
+        console.log(user.verificationToken);
         await sendEmail(email, verificationToken, fullName);
         return res.status(201).json({ message: "User registered successfully", user });
     } catch (error) {
-
+        console.log(error);
+        res.status(500).json({ message: error });
     }
 }
 
@@ -52,14 +59,12 @@ const login = async (req, res) => {
         if (missingFields.length > 0) {
             return res.status(400).json({ message: `Please provide ${missingFields.join(", ")}` });
         }
-        const user = await User.findOne({ email }).select("-password");
+
+        const user = await User.findOne({ email }).select("+password");
         if (!user) {
             return res.status(401).json({ message: "Invalid email or password" });
         }
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(401).json({ message: "Invalid email or password" });
-        }
+   
         generateTokenAndSetCookie(user, res);
         res.status(200).json({ message: "User logged in successfully", user });
     } catch (error) {
@@ -151,7 +156,7 @@ const resetPassword = async (req, res) => {
     }
 }
 
-export const logout  = async(req,res) => {
+ const logout  = async(req,res) => {
     try {
         res.clearCookie("token");
         res.status(200).json({ message: "User logged out successfully" });
