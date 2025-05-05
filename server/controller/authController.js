@@ -45,7 +45,35 @@ const register = async (req,res) => {
 }
 
 const login = async(req,res) => {
+    try {
+        const {email,password} = req.body;
+        const requiredFields = ["email","password"];
+        const missingFields = requiredFields.filter(field => !req.body[field]);
+        if(missingFields.length > 0) {
+            return res.status(400).json({message:`Please provide ${missingFields.join(", ")}`});
+        }
+        const user = await User.findOne({email}).select("-password");
+        if(!user) {
+            return res.status(401).json({message:"Invalid email or password"});
+        }
+        const isMatch = await bcrypt.compare(password, user.password);
+        if(!isMatch) {
+            return res.status(401).json({message:"Invalid email or password"});
+        }
+        generateTokenAndSetCookie(user,res);
+         res.status(200).json({message:"User logged in successfully",user});
+    } catch (error) {
+        res.status(500).json({message:"Internal server error"});
+    }
+}
 
+const forgetPassord = async(req,res) => {
+    try {
+        const {email}= req.body;
+            
+    } catch (error) {
+        
+    }
 }
 
 export  {register,login};
