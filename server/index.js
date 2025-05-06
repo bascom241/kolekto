@@ -11,7 +11,7 @@ const app = express();
 dotenv.config();
 app.use(cors(
     {
-        origin: "*",
+        origin: "http://localhost:8081",
         credentials: true, // Allow credentials (cookies) to be sent
     }
 ));

@@ -51,9 +51,9 @@ const AuthenticatedApp = () => (
     
     {/* Protected Dashboard Routes */}
     <Route path="/dashboard" element={
-      <ProtectedRoute>
+
         <DashboardLayout />
-      </ProtectedRoute>
+      
     }>
       <Route index element={<DashboardPage />} />
       <Route path="collections" element={<CollectionsPage />} />
