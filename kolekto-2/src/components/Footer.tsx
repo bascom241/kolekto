@@ -57,9 +57,10 @@ const Footer: React.FC = () => {
           <div className="col-span-1">
             <h3 className="font-semibold text-sm mb-4">Connect</h3>
             <ul className="space-y-2">
-              <li><a href="#" className="text-sm text-gray-600 hover:text-kolekto">Twitter</a></li>
-              <li><a href="#" className="text-sm text-gray-600 hover:text-kolekto">Facebook</a></li>
-              <li><a href="#" className="text-sm text-gray-600 hover:text-kolekto">Instagram</a></li>
+              <li><a href="https://x.com/kolektng?s=21" className="text-sm text-gray-600 hover:text-kolekto">Twitter</a></li>
+              <li><a href="https://www.facebook.com/share/1AVyxK7Prc/?mibextid=wwXIfr" className="text-sm text-gray-600 hover:text-kolekto">Facebook</a></li>
+              <li><a href="https://www.instagram.com/kolekto.ng" className="text-sm text-gray-600 hover:text-kolekto">Instagram</a></li>
+              <li><a href="https://www.linkedin.com/company/kolektong/" className="text-sm text-gray-600 hover:text-kolekto">Linkedin</a></li>
             </ul>
           </div>
         </div>
