@@ -28,14 +28,15 @@ const register = async (req, res) => {
 
 
         const verificationToken = Math.floor(100000 + Math.random() * 900000).toString();
-
+        const verificationTokenExpiresDate = Date.now() + 24 * 60 * 60 * 1000;
         const user = new User({
             fullName,
             email,
             password: hashedPassowrd,
             confirmPassword,
             phoneNumber,
-            verificationToken
+            verificationToken,
+            verificationTokenExpiresDate
         });
 
         console.log(3,user)
@@ -44,7 +45,7 @@ const register = async (req, res) => {
         generateTokenAndSetCookie(user, res);
         console.log(user.verificationToken);
         await sendEmail(email, verificationToken, fullName);
-        return res.status(201).json({ message: "User registered successfully", user });
+        return res.status(201).json({ message: "Registration successful! Check your email to confirm your account.", user });
     } catch (error) {
         console.log(error);
         res.status(500).json({ message: error });
@@ -71,35 +72,66 @@ const login = async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 }
-
 const verifyEmail = async (req, res) => {
     try {
-
-
         const { code } = req.body;
-        if (!code) return res.status(403).json({ success: false, message: "Verification code is required" });
+        if (!code) {
+            return res.status(400).json({ success: false, message: "Verification code is required" });
+        }
 
+        // Log the incoming code for debugging
+        console.log("Received verification code:", code);
+
+        // Trim and normalize the code to handle whitespace or formatting issues
+        const normalizedCode = code.trim();
+
+        // Query for user with the verification token and unexpired token
         const user = await User.findOne({
-            verificationToken: { $exists: true },
-            verificationTokenExpiresDate: { $gte: Date.now() }
+            verificationToken: normalizedCode,
+            verificationTokenExpiresDate: { $gt: Date.now() }
         });
 
-        if (!user) return res.status(403).json({ sucess: false, message: "Token Expired" });
+        // Log the query result and database state for debugging
+        console.log("Queried user:", user);
+        if (!user) {
+            // Additional query to check if token exists but is expired or invalid
+            const tokenExists = await User.findOne({ verificationToken: normalizedCode });
+            const expiredToken = await User.findOne({
+                verificationToken: normalizedCode,
+                verificationTokenExpiresDate: { $lte: Date.now() }
+            });
+            console.log("Token exists check:", tokenExists);
+            console.log("Expired token check:", expiredToken);
 
-        const isMatch = await bcrypt.compare(code, user.verificationToken);
-        if (!isMatch) return res.status(403).json({ success: false, message: "Invalid Token" })
+            if (expiredToken) {
+                return res.status(400).json({ success: false, message: "Verification code has expired" });
+            }
+            if (tokenExists) {
+                return res.status(400).json({ success: false, message: "Invalid verification code" });
+            }
+            return res.status(404).json({ success: false, message: "No user found with this verification code" });
+        }
 
+        // Check if user is already verified
+        if (user.isVerified) {
+            return res.status(400).json({ success: false, message: "User already verified" });
+        }
+
+        // Update user verification status
         user.isVerified = true;
-        user.verificationTokenExpiresDate = undefined;
         user.verificationToken = undefined;
+        user.verificationTokenExpiresDate = undefined;
         await user.save();
-        res.status(200).json({ success: true, message: "User Verified" })
+
+        // Log successful verification
+        console.log("User verified:", user.email);
+
+        return res.status(200).json({ success: true, message: "User verified successfully" });
     } catch (error) {
-        res.status(500).json({ message: "Internal server error" });
+        console.error("Error in verifyEmail:", error);
+        return res.status(500).json({ success: false, message: "Internal server error" });
     }
-}
-
-
+};
 const forgetPassord = async (req, res) => {
     try {
         const { email } = req.body;
@@ -165,6 +197,20 @@ const resetPassword = async (req, res) => {
     }
 }
 
-export { register, login, forgetPassord, resetPassword,verifyEmail,logout };
+
+const checkAuth = async (req,res)=>{
+
+    try {
+        const user = await User.findById(req.user.userId).select("-password");
+        if(!user) return res.status(401).json({message:"User not found"});
+        res.status(200).json({success:true,user})
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({message:"Internal server error"});
+    }
+
+}
+
+export { register, login, forgetPassord, resetPassword,verifyEmail,logout,checkAuth};
 
 

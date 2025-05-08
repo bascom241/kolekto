@@ -79,7 +79,7 @@ const PaymentSuccessful: React.FC<PaymentSuccessfulProps> = ({
             <p className="text-lg font-medium">{collectionTitle}</p>
             <p className="text-2xl font-bold">₦{amountPaid.toLocaleString()}</p>
             {transactionRef && (
-              <p className="text-sm text-gray-500">Transaction Ref: {transactionRef}</p>
+              <p className="text-sm text-gray-500">Transaction Ref: ${transactionRef}</p>
             )}
           </div>
           
@@ -88,7 +88,7 @@ const PaymentSuccessful: React.FC<PaymentSuccessfulProps> = ({
               <Card key={participant.id} className="bg-gray-50">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium flex justify-between items-center">
-                    <span>Participant {participants.length > 1 ? index + 1 : ''}</span>
+                    <span>Participant ${participants.length > 1 ? index + 1 : ''}</span>
                     <Badge className="font-mono">{participant.uniqueCode}</Badge>
                   </CardTitle>
                 </CardHeader>

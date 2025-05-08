@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,16 +5,18 @@ import { Link, useNavigate } from 'react-router-dom';
 import CollectionCard from '@/components/collections/CollectionCard';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
-import { useTransactions } from '@/hooks/useTransactions';
+import { useCollectionStore } from '@/store/useCollectionStore';
 import { Loader2 } from 'lucide-react';
 
 const CollectionsPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { useCollectionsList } = useTransactions();
-  const { data: collections, isLoading, error } = useCollectionsList(user?.id);
+  const { collections, isLoading, error, fetchCollections } = useCollectionStore();
 
-  // Handle any errors from the query
+  React.useEffect(() => {
+    fetchCollections();
+  }, [fetchCollections]);
+
   React.useEffect(() => {
     if (error) {
       console.error('Error loading collections:', error);
@@ -25,7 +26,6 @@ const CollectionsPage: React.FC = () => {
 
   const handleShare = (id: string) => {
     console.log('Navigating to share collection with id:', id);
-    // Make sure we have a valid ID before navigating
     if (id) {
       navigate(`/dashboard/collections/${id}?share=true`);
     } else {
@@ -35,7 +35,6 @@ const CollectionsPage: React.FC = () => {
 
   const handleViewDetails = (id: string) => {
     console.log('Navigating to view collection with id:', id);
-    // Make sure we have a valid ID before navigating
     if (id) {
       navigate(`/dashboard/collections/${id}`);
     } else {

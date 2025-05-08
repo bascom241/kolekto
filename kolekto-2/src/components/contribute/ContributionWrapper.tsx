@@ -1,9 +1,7 @@
-
 import React, { useState } from 'react';
 import ContributionForm from './ContributionForm';
 import PaymentSuccessful from './PaymentSuccessful';
 import PaymentErrorHandler from './PaymentErrorHandler';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface Field {
@@ -62,7 +60,7 @@ const ContributionWrapper: React.FC<ContributionWrapperProps> = ({
     setError(errorMsg);
     setTimeout(() => {
       setError(null);
-    }, 10000); // Clear error after 10 seconds
+    }, 10000);
   };
   
   const handleRetry = () => {

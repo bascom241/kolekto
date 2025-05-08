@@ -14,10 +14,10 @@ import {
 import { Plus, Trash2, Key } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useCollectionStore } from '@/store/useCollectionStore';
 
 interface FormField {
   id: string;
@@ -41,10 +41,9 @@ const CreateCollectionForm: React.FC = () => {
     { id: '3', name: 'Phone Number', type: 'tel', required: false },
   ]);
 
-  const { user } = useAuth();
   const navigate = useNavigate();
-
-  const [isLoading, setIsLoading] = useState(false);
+  const { authUser } = useAuthStore();
+  const { isCreating, createCollection } = useCollectionStore();
 
   const [feeBearer, setFeeBearer] = useState<'organizer' | 'contributor'>('organizer');
   const [kolektoFee, setKolektoFee] = useState(0);
@@ -110,44 +109,41 @@ const CreateCollectionForm: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
 
-    if (!user) {
+    if (!authUser) {
       toast.error("You must be logged in to create a collection.");
-      setIsLoading(false);
+      navigate('/login');
       return;
     }
 
-    const deadlineDate = deadline ? new Date(deadline) : null;
-
+    const deadlineDate = deadline ? new Date(deadline).toISOString() : null;
     const maxParticipantsValue = isMaxParticipantsEnabled ? parseInt(maxParticipants) : null;
 
-    try {
-      const { data, error } = await supabase.from('collections').insert({
-        title,
-        description: description || null,
-        amount: parseFloat(amount),
-        max_participants: maxParticipantsValue,
-        deadline: deadlineDate ? deadlineDate.toISOString() : null,
-        organizer_id: user.id,
-        status: "active",
-      }).select();
+    const payload = {
+      collectionTittle: title,
+      collectionDescription: description || null,
+      amount: parseFloat(amount),
+      amountBreakdown: {
+        baseAmount: amount ? parseFloat(amount) : 0,
+        kolektoFee,
+        paymentGatewayFee,
+        totalFees,
+        totalPayable,
+        feeBearer,
+      },
+      deadline: deadlineDate,
+      numberOfParticipants: maxParticipantsValue,
+      participantInformation: formFields.map(field => ({
+        name: field.name,
+        type: field.type,
+        required: field.required,
+        value: null,
+      })),
+      generateUniqueCodes,
+      codePrefix: generateUniqueCodes ? codePrefix : null,
+    };
 
-      if (error) {
-        console.error("Collection creation failed:", error);
-        toast.error("Failed to create collection: " + (error.message || "Unknown error"));
-      } else {
-        toast.success("Collection created successfully!");
-        console.log("Collection created:", data);
-        
-        navigate('/dashboard/collections');
-      }
-    } catch (err: any) {
-      console.error("Unexpected error:", err);
-      toast.error("An unexpected error occurred. Please try again.");
-    }
-
-    setIsLoading(false);
+    await createCollection(payload, navigate);
   };
 
   const getKolektoFeePercentage = () => {
@@ -403,9 +399,9 @@ const CreateCollectionForm: React.FC = () => {
         <Button 
           type="submit" 
           className="w-full bg-kolekto hover:bg-kolekto/90"
-          disabled={isLoading}
+          disabled={isCreating}
         >
-          {isLoading ? "Creating Collection..." : "Create Collection"}
+          {isCreating ? "Creating Collection..." : "Create Collection"}
         </Button>
       </div>
     </form>

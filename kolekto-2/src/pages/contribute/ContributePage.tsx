@@ -1,66 +1,48 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import NavBar from '@/components/NavBar';
 import Footer from '@/components/Footer';
 import ContributionWrapper from '@/components/contribute/ContributionWrapper';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-
+import { useCollectionStore } from '@/store/useCollectionStore';
+import { usePaymentStore } from '@/store/usePayment';
 const ContributePage: React.FC = () => {
-  const { collectionId } = useParams<{ collectionId: string }>();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [collection, setCollection] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
-  useEffect(() => {
-    const fetchCollection = async () => {
-      if (!collectionId) {
-        setError('Collection ID is missing');
-        setLoading(false);
-        return;
-      }
+  const { 
+    selectedCollection: collection, 
+    isLoading, 
+    error, 
+    fetchCollection 
+  } = useCollectionStore();
 
-      try {
-        const { data, error } = await supabase
-          .from('collections')
-          .select('*')
-          .eq('id', collectionId)
-          .single();
-        
-        if (error) {
-          throw error;
-        }
-        
-        if (!data) {
-          throw new Error('Collection not found');
-        }
-        
-        // Check if collection is still active
-        if (data.status !== 'active') {
-          throw new Error('This collection is no longer accepting contributions');
-        }
-        
-        // Check if deadline has passed
-        if (data.deadline && new Date(data.deadline) < new Date()) {
-          throw new Error('The deadline for this collection has passed');
-        }
-        
-        setCollection(data);
-      } catch (err: any) {
-        console.error('Error fetching collection:', err);
-        setError(err.message || 'Failed to fetch collection details');
-        toast.error(err.message || 'Failed to fetch collection details');
-      } finally {
-        setLoading(false);
+  useEffect(() => {
+    if (id) {
+      fetchCollection(id);
+    } else {
+      toast.error('Collection ID is missing');
+    }
+  }, [id, fetchCollection]);
+
+  useEffect(() => {
+    if (error) {
+      console.error('Error fetching collection:', error);
+      toast.error(error);
+    }
+  }, [error]);
+
+  // Validate collection status and deadline
+  useEffect(() => {
+    if (collection && !isLoading) {
+      if (collection.status !== 'active') {
+        toast.error('This collection is no longer accepting contributions');
+      } else if (collection.deadline && new Date(collection.deadline) < new Date()) {
+        toast.error('The deadline for this collection has passed');
       }
-    };
-    
-    fetchCollection();
-  }, [collectionId]);
+    }
+  }, [collection, isLoading]);
 
   // Default fields for all collections
   const defaultFields = [
@@ -68,9 +50,9 @@ const ContributePage: React.FC = () => {
     { name: 'Email', type: 'email', required: true },
     { name: 'Phone Number', type: 'tel', required: false },
   ];
-  
+
   // If still loading
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col">
         <NavBar />
@@ -83,9 +65,9 @@ const ContributePage: React.FC = () => {
       </div>
     );
   }
-  
+
   // If there was an error or collection not found
-  if (error || !collection) {
+  if (error || !collection || collection.status !== 'active' || (collection.deadline && new Date(collection.deadline) < new Date())) {
     return (
       <div className="min-h-screen flex flex-col">
         <NavBar />
@@ -102,7 +84,7 @@ const ContributePage: React.FC = () => {
       </div>
     );
   }
-  
+
   return (
     <div className="min-h-screen flex flex-col">
       <NavBar />

@@ -1,51 +1,55 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Link } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from 'sonner';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useAuthStore } from '@/store/useAuthStore';
+import { useNavigate } from 'react-router-dom';
 
 const RegisterForm: React.FC = () => {
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [formData, setFormData] = useState({
+    fullName: '',
+    email: '',
+    phoneNumber: '',
+    password: '',
+    confirmPassword: ''
+  });
+  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [isSignupComplete, setIsSignupComplete] = useState(false);
-  
-  const { signUp } = useAuth();
+
+  const navigate = useNavigate();
+  const { register } = useAuthStore();
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.id]: e.target.value
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    
-    if (password !== confirmPassword) {
+    setError(null);
+
+    if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
+      toast.error('Registration failed');
       return;
     }
 
-    if (phoneNumber && phoneNumber.replace(/\D/g, '').length < 10) {
+    if (formData.phoneNumber && formData.phoneNumber.replace(/\D/g, '').length < 10) {
       setError('Phone number must be at least 10 digits');
+      toast.error('Registration failed');
       return;
     }
-    
+
     setIsLoading(true);
-    
+
     try {
-      const { error } = await signUp(email, password, fullName, phoneNumber);
-      
-      if (error) {
-        setError(error.message);
-        toast.error('Registration failed');
-      } else {
-        setIsSignupComplete(true);
-        toast.success('Registration successful! Check your email to confirm your account.');
-      }
+      await register(formData, navigate);
+    
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred');
       toast.error('Registration failed');
@@ -53,27 +57,6 @@ const RegisterForm: React.FC = () => {
       setIsLoading(false);
     }
   };
-
-  if (isSignupComplete) {
-    return (
-      <div className="text-center space-y-4">
-        <div className="bg-green-50 text-green-700 p-4 rounded-md">
-          <h3 className="font-medium">Registration successful!</h3>
-          <p className="text-sm mt-1">
-            Please check your email to confirm your account.
-          </p>
-        </div>
-        <p className="text-sm text-gray-600">
-          A confirmation link has been sent to <strong>{email}</strong>
-        </p>
-        <div className="mt-4">
-          <Link to="/login" className="text-kolekto hover:underline">
-            Back to login
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto">
@@ -90,8 +73,8 @@ const RegisterForm: React.FC = () => {
           type="text"
           placeholder="John Doe"
           required
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
+          value={formData.fullName}
+          onChange={handleChange}
           className="w-full"
         />
       </div>
@@ -103,8 +86,8 @@ const RegisterForm: React.FC = () => {
           type="email"
           placeholder="name@example.com"
           required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          value={formData.email}
+          onChange={handleChange}
           className="w-full"
         />
       </div>
@@ -115,8 +98,8 @@ const RegisterForm: React.FC = () => {
           id="phoneNumber"
           type="tel"
           placeholder="+234 123 456 7890"
-          value={phoneNumber}
-          onChange={(e) => setPhoneNumber(e.target.value)}
+          value={formData.phoneNumber}
+          onChange={handleChange}
           className="w-full"
         />
       </div>
@@ -127,8 +110,8 @@ const RegisterForm: React.FC = () => {
           id="password"
           type="password"
           required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          value={formData.password}
+          onChange={handleChange}
           className="w-full"
         />
       </div>
@@ -139,8 +122,8 @@ const RegisterForm: React.FC = () => {
           id="confirmPassword"
           type="password"
           required
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
+          value={formData.confirmPassword}
+          onChange={handleChange}
           className="w-full"
         />
       </div>

@@ -1,11 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import QRCodeDisplay from '@/components/collections/QRCodeDisplay';
-import { useTransactions } from '@/hooks/useTransactions';
 import { useAuth } from '@/context/AuthContext';
 import { 
   BarChart, Calendar, Download, Eye, Share, Wallet,
@@ -41,6 +39,29 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
+import { useCollectionStore } from '@/store/useCollectionStore';
+
+// Static mock contributor data
+const mockContributors = [
+  {
+    id: '1',
+    contributor_name: 'John Doe',
+    contributor_email: 'john@example.com',
+    contributor_phone: '1234567890',
+    created_at: '2025-05-01',
+    amount: 10000,
+    status: 'paid'
+  },
+  {
+    id: '2',
+    contributor_name: 'Jane Smith',
+    contributor_email: 'jane@example.com',
+    contributor_phone: '0987654321',
+    created_at: '2025-05-02',
+    amount: 15000,
+    status: 'paid'
+  }
+];
 
 const CollectionDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -52,23 +73,19 @@ const CollectionDetailsPage: React.FC = () => {
   const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const { user } = useAuth();
-  const { 
-    useCollectionById, 
-    useContributionsList,
-    submitWithdrawal 
-  } = useTransactions();
   
   const { 
-    data: collection, 
+    selectedCollection: collection, 
     isLoading: collectionLoading, 
-    error: collectionError
-  } = useCollectionById(id);
-  
-  const { 
-    data: contributors = [],
-    isLoading: contributorsLoading,
-    error: contributorsError
-  } = useContributionsList(id);
+    error: collectionError,
+    fetchCollection
+  } = useCollectionStore();
+
+  useEffect(() => {
+    if (id) {
+      fetchCollection(id);
+    }
+  }, [id, fetchCollection]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -84,13 +101,6 @@ const CollectionDetailsPage: React.FC = () => {
     }
   }, [collectionError]);
 
-  useEffect(() => {
-    if (contributorsError) {
-      console.error('Error fetching contributors:', contributorsError);
-      toast.error('Failed to load contributors');
-    }
-  }, [contributorsError]);
-
   const shareUrl = `${window.location.origin}/contribute/${id}`;
 
   const handleShare = () => {
@@ -98,13 +108,11 @@ const CollectionDetailsPage: React.FC = () => {
   };
 
   const exportToCSV = () => {
-    // If no contributors, show a message
-    if (!contributors || contributors.length === 0) {
+    if (!mockContributors || mockContributors.length === 0) {
       toast.info("No contributors data to export");
       return;
     }
     
-    // Define headers for CSV (excluding sensitive data like amount)
     const headers = [
       'Name', 
       'Email', 
@@ -115,7 +123,7 @@ const CollectionDetailsPage: React.FC = () => {
     
     let csvContent = headers.join(',') + '\n';
     
-    contributors.forEach(contributor => {
+    mockContributors.forEach(contributor => {
       const formattedDate = new Date(contributor.created_at).toLocaleDateString('en-NG');
       const row = [
         contributor.contributor_name,
@@ -144,7 +152,7 @@ const CollectionDetailsPage: React.FC = () => {
     setIsWithdrawDialogOpen(true);
   };
 
-  const onWithdrawComplete = async (data: {
+  const onWithdrawComplete = (data: {
     amount: number;
     accountName: string;
     accountNumber: string;
@@ -155,23 +163,18 @@ const CollectionDetailsPage: React.FC = () => {
       return;
     }
 
-    try {
-      await submitWithdrawal({
-        organizer_id: user.id,
-        collection_id: collection.id,
-        amount: data.amount,
-        account_name: data.accountName,
-        account_number: data.accountNumber,
-        bank_name: data.bankName
-      });
-      
-      setIsWithdrawDialogOpen(false);
-      toast.success('Withdrawal request is in progress. You\'ll be notified once it\'s completed.');
-    } catch (error: any) {
-      console.error('Withdrawal error:', error);
-      toast.error(error.message || 'Failed to submit withdrawal request');
-      setIsWithdrawDialogOpen(false);
-    }
+    // Mock withdrawal logic
+    console.log('Mock withdrawal:', {
+      organizer_id: user.id,
+      collection_id: collection.id,
+      amount: data.amount,
+      account_name: data.accountName,
+      account_number: data.accountNumber,
+      bank_name: data.bankName
+    });
+    
+    setIsWithdrawDialogOpen(false);
+    toast.success('Withdrawal request simulated. In a real app, this would be processed.');
   };
 
   const getStatusColor = (status: string) => {
@@ -204,34 +207,30 @@ const CollectionDetailsPage: React.FC = () => {
     }
   };
 
-  const filteredContributors = contributors?.filter(contributor => 
+  const filteredContributors = mockContributors.filter(contributor => 
     contributor.contributor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     contributor.contributor_email?.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  );
 
-  // Group contributions by date for chart data
-  const contributionsByDate = contributors?.reduce((acc: Record<string, number>, curr) => {
+  const contributionsByDate = mockContributors.reduce((acc: Record<string, number>, curr) => {
     const date = new Date(curr.created_at).toLocaleDateString('en-NG');
     acc[date] = (acc[date] || 0) + (curr.amount || 0);
     return acc;
   }, {});
 
-  const chartData = Object.keys(contributionsByDate || {}).map(date => ({
+  const chartData = Object.keys(contributionsByDate).map(date => ({
     date,
-    amount: contributionsByDate?.[date] || 0
+    amount: contributionsByDate[date] || 0
   }));
 
-  // Calculate total collected amount and withdrawable amount
-  const totalCollected = contributors?.reduce((sum, contributor) => {
+  const totalCollected = mockContributors.reduce((sum, contributor) => {
     return contributor.status === 'paid' ? sum + (contributor.amount || 0) : sum;
-  }, 0) || 0;
+  }, 0);
   
-  const contributorsCount = contributors?.filter(c => c.status === 'paid').length || 0;
-  const withdrawableAmount = totalCollected * 0.9; // 90% of total is withdrawable (assuming 10% platform fee)
-  
-  const isLoading = collectionLoading || contributorsLoading;
+  const contributorsCount = mockContributors.filter(c => c.status === 'paid').length;
+  const withdrawableAmount = totalCollected * 0.9;
 
-  if (isLoading) {
+  if (collectionLoading) {
     return (
       <div className="py-10 text-center text-gray-500">
         <div className="flex justify-center items-center">
@@ -567,9 +566,9 @@ const CollectionDetailsPage: React.FC = () => {
               )}
               
               <h3 className="font-medium mb-4">Recent Contributions</h3>
-              {contributors && contributors.length > 0 ? (
+              {filteredContributors.length > 0 ? (
                 <div className="space-y-4">
-                  {contributors.slice(0, 5).map((contributor) => (
+                  {filteredContributors.slice(0, 5).map((contributor) => (
                     <div key={contributor.id} className="flex justify-between items-center border-b pb-2">
                       <div>
                         <div className="font-medium">{contributor.contributor_name}</div>
@@ -629,7 +628,6 @@ const CollectionDetailsPage: React.FC = () => {
                     console.error('Error sharing:', err);
                   });
                 } else {
-                  // Fallback if Web Share API is not available
                   navigator.clipboard.writeText(shareUrl);
                   toast.success('Link copied to clipboard!');
                 }

@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
@@ -17,44 +17,70 @@ import TransactionHistoryPage from "./pages/dashboard/SettingsPage";
 import ContributePage from "./pages/contribute/ContributePage";
 import NotFound from "./pages/NotFound";
 import CollectionDetailsPage from "./pages/dashboard/CollectionDetailsPage";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { AuthProvider } from "./context/AuthContext";
 import UserProfilePage from "./pages/dashboard/UserProfilePage";
+import VerifyEmail from "./pages/auth/VerifyEmail";
+import { useAuthStore } from "./store/useAuthStore";
+import { useEffect } from "react";
+import PaymentSuccessPage from "./success/PaymentSuccessPage";
 
-// Create query client outside of the component to avoid React hooks issues
+// Create query client outside of the component
 const queryClient = new QueryClient();
 
 // Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading } = useAuth();
-  
-  if (isLoading) {
+  const { authUser, isCheckingAuth } = useAuthStore();
+
+  if (isCheckingAuth) {
     return <div className="flex justify-center items-center h-screen">Loading...</div>;
   }
-  
-  if (!user) {
+
+  if (!authUser) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return <>{children}</>;
 };
 
-// Auth layout that wraps all routes
+// Public route component to redirect authenticated users to dashboard for specific routes
+const PublicRoute = ({ children }: { children: React.ReactNode }) => {
+  const { authUser, isCheckingAuth } = useAuthStore();
+  const location = useLocation();
+
+  if (isCheckingAuth) {
+    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+  }
+
+  // Redirect authenticated users to /dashboard only for specific public routes
+  const redirectRoutes = ['/', '/login', '/register', '/forgot-password', '/reset-password'];
+  if (authUser && redirectRoutes.includes(location.pathname)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+// Authenticated app routes
 const AuthenticatedApp = () => (
   <Routes>
     {/* Public Routes */}
-    <Route path="/" element={<HomePage />} />
-    <Route path="/login" element={<LoginPage />} />
-    <Route path="/register" element={<RegisterPage />} />
-    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-    <Route path="/reset-password" element={<ResetPasswordPage />} />
-    <Route path="/contribute/:collectionId" element={<ContributePage />} />
-    
+    <Route path="/" element={<PublicRoute><HomePage /></PublicRoute>} />
+    <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+    <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+    <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
+    <Route path="/reset-password" element={<PublicRoute><ResetPasswordPage /></PublicRoute>} />
+    <Route path="/contribute/:id" element={<PublicRoute><ContributePage /></PublicRoute>} />
+    <Route path="/verify-email" element={<PublicRoute><VerifyEmail /></PublicRoute>} />
+    <Route path="/success" element={<PublicRoute><PaymentSuccessPage /></PublicRoute>} /> {/* Add this line */}
     {/* Protected Dashboard Routes */}
-    <Route path="/dashboard" element={
-
-        <DashboardLayout />
-      
-    }>
+    <Route
+      path="/dashboard"
+      element={
+        <ProtectedRoute>
+          <DashboardLayout />
+        </ProtectedRoute>
+      }
+    >
       <Route index element={<DashboardPage />} />
       <Route path="collections" element={<CollectionsPage />} />
       <Route path="collections/:id" element={<CollectionDetailsPage />} />
@@ -62,14 +88,20 @@ const AuthenticatedApp = () => (
       <Route path="profile" element={<UserProfilePage />} />
       <Route path="transactions" element={<TransactionHistoryPage />} />
     </Route>
-    
+
     {/* Catch-all for 404 */}
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
 
-// Main App component restructured to fix React hooks issues
+// Main App component
 const App = () => {
+  const { checkAuth } = useAuthStore();
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClient}>

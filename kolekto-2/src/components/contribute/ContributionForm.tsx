@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,8 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ArrowRight, Check } from "lucide-react";
-import { supabase } from '@/integrations/supabase/client';
-import { usePaystack } from '@/hooks/usePaystack';
+import { usePaymentStore } from '@/store/usePayment'; // Adjust the import path
 import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -53,58 +52,20 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
   onPaymentSuccess,
   onPaymentError,
 }) => {
-  const [step, setState] = useState<'contact' | 'details' | 'payment'>('contact');
-  const setStep = setState; // This alias keeps existing functionality
-
+  const [step, setStep] = useState<'contact' | 'details' | 'payment'>('contact');
   const [numberOfParticipants, setNumberOfParticipants] = useState(1);
   const [participants, setParticipants] = useState<Participant[]>([{ id: '1', data: {} }]);
   const [paymentMethod, setPaymentMethod] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [publicKey, setPublicKey] = useState<string | null>(null);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-
   const [contactInfo, setContactInfo] = useState({
     name: '',
     email: '',
     phone: '',
   });
-
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
-  const { initiatePayment, verifyPayment, isLoading: paystackLoading } = usePaystack();
-
-  useEffect(() => {
-    const fetchPaystackKey = async () => {
-      try {
-        console.log('Attempting to fetch Paystack public key from Supabase...');
-        const { data, error } = await supabase
-          .from('payment_config')
-          .select('key_value')
-          .eq('key_name', 'paystack_public_key')
-          .single();
-
-        if (error) {
-          console.error('Supabase fetch error:', error.message, error.details, error.hint);
-          throw new Error(`Failed to fetch Paystack public key: ${error.message}`);
-        }
-
-        if (!data || !data.key_value) {
-          console.error('No data returned or key_value is null:', data);
-          throw new Error('Paystack public key not found in database.');
-        }
-
-        console.log('Successfully fetched Paystack public key:', data.key_value);
-        setPublicKey(data.key_value);
-      } catch (error: any) {
-        console.error('Error fetching Paystack public key:', error.message);
-        setFetchError('Failed to load payment configuration. Please try again later.');
-        setPublicKey(null);
-      }
-    };
-
-    fetchPaystackKey();
-  }, []);
+  const { initializePayment, verifyPayment, paymentLoading } = usePaymentStore();
 
   const handleContactInfoChange = (field: string, value: string) => {
     setContactInfo((prev) => ({ ...prev, [field]: value }));
@@ -144,9 +105,7 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
   };
 
   const nextStep = () => {
-    // Clear any previous payment errors when moving between steps
     setPaymentError(null);
-    
     if (step === 'contact' && isContactInfoComplete()) {
       setStep('details');
     } else if (step === 'details') {
@@ -165,23 +124,13 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
   };
 
   const previousStep = () => {
-    // Clear any previous payment errors when moving between steps
     setPaymentError(null);
-    
     if (step === 'details') {
       setStep('contact');
     } else if (step === 'payment') {
       setStep('details');
     }
   };
-
-  if (fetchError) {
-    return <div className="text-red-500 text-center p-4">{fetchError}</div>;
-  }
-
-  if (!publicKey) {
-    return <div className="text-center p-4">Loading payment configuration...</div>;
-  }
 
   const prepareParticipantData = () => {
     const preparedParticipants = [...participants];
@@ -199,38 +148,41 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
     return preparedParticipants;
   };
 
-  const handlePaystackPayment = async () => {
+  const handlePayment = async () => {
     try {
       setIsLoading(true);
-      setPaymentError(null); // Clear previous errors
+      setPaymentError(null);
 
       const totalAmount = amount * numberOfParticipants;
       const preparedParticipants = prepareParticipantData();
 
-      const metadata = {
-        collectionId,
-        collectionTitle,
-        participants: preparedParticipants.map((p) => ({ data: p.data })),
-        custom_fields: [],
+      // Data to match backend's expected fields
+      const paymentData = {
+        fullName: contactInfo.name,
+        email: contactInfo.email,
+        phoneNumber: contactInfo.phone,
+        amount: totalAmount,
       };
 
-      console.log('Initiating payment with:', {
-        email: contactInfo.email,
-        amount: totalAmount,
-        metadata,
-      });
+      console.log('Initiating payment with:', paymentData);
 
-      const paymentData = await initiatePayment(contactInfo.email, totalAmount, metadata);
+      const response = await initializePayment(paymentData);
 
-      console.log('Payment initiated:', paymentData);
+      if (!response) {
+        throw new Error('Failed to initialize payment');
+      }
 
-      if (paymentData.authorization_url) {
-        window.open(paymentData.authorization_url, '_blank');
+      const { authorization_url: authorizationUrl, reference } = response;
+
+      console.log('Payment initiated:', { authorizationUrl, reference });
+
+      if (authorizationUrl) {
+        window.open(authorizationUrl, '_blank');
 
         const checkInterval = setInterval(async () => {
           try {
-            console.log('Checking payment status for reference:', paymentData.reference);
-            const verificationData = await verifyPayment(paymentData.reference);
+            console.log('Checking payment status for reference:', reference);
+            const verificationData = await verifyPayment(reference);
 
             if (verificationData && verificationData.status === 'success') {
               clearInterval(checkInterval);
@@ -238,15 +190,24 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
               const successData = {
                 collectionId,
                 participants: preparedParticipants,
-                paymentMethod: 'Paystack',
+                paymentMethod: 'Paystack', // Using Paystack as per backend
                 totalAmount,
                 contactInfo,
-                transactionRef: paymentData.reference,
+                transactionRef: reference,
               };
 
               console.log('Payment success with data:', successData);
 
-              await updateSupabaseAfterPayment(successData);
+              // Call Express endpoint to record payment
+              const response = await fetch('/api/payments/record', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(successData),
+              });
+
+              if (!response.ok) {
+                throw new Error('Failed to record payment');
+              }
 
               onPaymentSuccess(successData);
               setIsLoading(false);
@@ -262,141 +223,17 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
             setIsLoading(false);
             toast.info('Payment verification timed out. If you completed the payment, please check your email for confirmation.');
           }
-        }, 300000);
+        }, 300000); // 5 minutes timeout
       } else {
         throw new Error('Failed to get payment URL');
       }
     } catch (error: any) {
       console.error('Payment failed:', error);
       setIsLoading(false);
-      
-      // Set the error message for display in the UI
       setPaymentError(error.message || 'Payment failed. Please try again.');
-      
-      // Also show a toast notification
       toast.error(error.message || 'Payment failed. Please try again.');
-      
-      // Call the error handler from props
       onPaymentError(error.message || 'Payment failed. Please try again.');
-      
-      // Increment retry count
       setRetryCount(prev => prev + 1);
-    }
-  };
-
-  const updateSupabaseAfterPayment = async (paymentData: any) => {
-    try {
-      console.log('Updating Supabase with payment data:', paymentData);
-
-      const { collectionId, participants, totalAmount, transactionRef, contactInfo } = paymentData;
-
-      for (const participant of participants) {
-        const uniqueCode = `${collectionId.slice(0, 6)}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-
-        const contributorData = {
-          collection_id: collectionId,
-          contributor_name: participant.data['Full Name'] || contactInfo.name,
-          contributor_email: participant.data['Email'] || contactInfo.email,
-          contributor_phone: participant.data['Phone'] || contactInfo.phone,
-          contributor_id: 'anonymous',
-          amount,
-          status: 'paid',
-          payment_method: 'paystack',
-          payment_reference: transactionRef,
-          receipt_details: {
-            reference: transactionRef,
-            collection_title: collectionTitle,
-            unique_code: uniqueCode,
-          },
-          contact_info: Object.keys(participant.data || {}).reduce((acc: any, key: string) => {
-            if (!['Full Name', 'Name', 'Email', 'Phone Number', 'Phone'].includes(key)) {
-              acc[key] = participant.data[key];
-            }
-            return acc;
-          }, {}),
-        };
-
-        console.log('Inserting contribution with data:', contributorData);
-
-        const { data: contribution, error: contribError } = await supabase
-          .from('contributions')
-          .insert(contributorData)
-          .select('id');
-
-        if (contribError) {
-          console.error('Error recording contribution:', contribError);
-          continue;
-        }
-
-        console.log('Contribution inserted successfully:', contribution);
-
-        if (contribution && contribution[0]?.id) {
-          const platformChargePercent = calculatePlatformChargePercentage(amount);
-          const platformCharge = amount * platformChargePercent;
-          const gatewayFee = Math.min(amount * 0.015, 2000);
-
-          const { data: trans, error: transError } = await supabase
-            .from('transactions')
-            .insert({
-              collection_id: collectionId,
-              contribution_id: contribution[0].id,
-              type: 'contribution',
-              status: 'successful',
-              amount,
-              description: `Payment for ${collectionTitle}`,
-            });
-
-          if (transError) {
-            console.error('Error recording transaction:', transError);
-          } else {
-            console.log('Transaction recorded successfully:', trans);
-          }
-        }
-      }
-
-      const { data: collection, error: collectionError } = await supabase
-        .from('collections')
-        .select('total_amount')
-        .eq('id', collectionId)
-        .single();
-
-      if (collectionError) {
-        console.error('Error fetching collection:', collectionError);
-      } else {
-        const currentTotal = collection?.total_amount || 0;
-        const newTotal = currentTotal + totalAmount;
-
-        const { data: updateResult, error: updateError } = await supabase
-          .from('collections')
-          .update({
-            total_amount: newTotal,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', collectionId);
-
-        if (updateError) {
-          console.error('Error updating collection total:', updateError);
-        } else {
-          console.log('Collection total updated successfully to:', newTotal);
-        }
-      }
-
-      toast.success('Payment data successfully recorded.');
-    } catch (err) {
-      console.error('Error updating Supabase after payment:', err);
-      toast.error('There was an issue recording your payment details.');
-    }
-  };
-
-  const calculatePlatformChargePercentage = (amount: number): number => {
-    if (amount < 1000) {
-      return 0.03;
-    } else if (amount < 5000) {
-      return 0.025;
-    } else if (amount < 20000) {
-      return 0.02;
-    } else {
-      return 0.015;
     }
   };
 
@@ -407,8 +244,8 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
       return;
     }
     setIsLoading(true);
-    setPaymentError(null); // Clear previous errors
-    handlePaystackPayment();
+    setPaymentError(null);
+    handlePayment();
   };
 
   const renderContactForm = () => (
@@ -592,9 +429,9 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
             <Button
               type="submit"
               className="w-full bg-kolekto hover:bg-kolekto/90"
-              disabled={isLoading || !paymentMethod}
+              disabled={isLoading || paymentLoading || !paymentMethod}
             >
-              {isLoading
+              {isLoading || paymentLoading
                 ? 'Processing...'
                 : `Pay ₦${(amount * numberOfParticipants).toLocaleString()}`}
             </Button>
