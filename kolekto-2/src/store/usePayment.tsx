@@ -1,6 +1,6 @@
-import { create } from 'zustand';
-import { toast } from 'sonner';
-import { axiosInstance } from '@/lib/axios';
+import { create } from "zustand";
+import { toast } from "sonner";
+import { axiosInstance } from "@/lib/axios";
 
 interface PaymentProps {
   paymentLoading: boolean;
@@ -13,7 +13,7 @@ export const usePaymentStore = create<PaymentProps>((set) => ({
   initializePayment: async (data) => {
     set({ paymentLoading: true });
     try {
-      const response = await axiosInstance.post('/initialize-payment', data);
+      const response = await axiosInstance.post("/initialize-payment", data);
       set({ paymentLoading: false });
       toast.success(response.data.message);
       return {
@@ -21,20 +21,22 @@ export const usePaymentStore = create<PaymentProps>((set) => ({
         reference: response.data.reference,
       };
     } catch (error: any) {
+      console.error("Payment initialization failed:", error);
       set({ paymentLoading: false });
-      toast.error(error.message || 'Failed to initialize payment');
+      toast.error(error.message || "Failed to initialize payment");
       return undefined;
     }
   },
   verifyPayment: async (reference) => {
     set({ paymentLoading: true });
     try {
-      const response = await axiosInstance.post('/verify-payment', { reference });
+      const response = await axiosInstance.get(`/verify-payment/${reference}`);
       set({ paymentLoading: false });
+      toast.success(response.data.message);
       return response.data;
     } catch (error: any) {
       set({ paymentLoading: false });
-      toast.error(error.message || 'Failed to verify payment');
+      toast.error(error.message || "Failed to verify payment");
       return undefined;
     }
   },
