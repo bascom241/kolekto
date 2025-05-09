@@ -18,9 +18,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ArrowRight, Check } from "lucide-react";
-import { usePaymentStore } from '@/store/usePayment'; // Adjust the import path
+import { usePaymentStore } from '@/store/usePayment';
 import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { axiosInstance } from "@/lib/axios";
 
 interface Field {
   name: string;
@@ -68,6 +69,7 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
   const { initializePayment, verifyPayment, paymentLoading } = usePaymentStore();
 
   const handleContactInfoChange = (field: string, value: string) => {
+    console.log(`Updating ${field}:`, value);
     setContactInfo((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -146,22 +148,75 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
       };
     }
     return preparedParticipants;
+  };const createContributor = async () => {
+    try {
+      const contributorData = {
+        name: contactInfo.name,
+        email: contactInfo.email,
+        phoneNumber: contactInfo.phone,
+        amount: amount * numberOfParticipants,
+        collectionId: collectionId // Make sure to include this
+      };
+      
+      console.log('Creating contributor with data:', contributorData);
+      
+      const response = await axiosInstance.post(
+        `/collections/${collectionId}/contributors`,
+        contributorData
+      );
+  
+      console.log('Full response:', response.data); // Log the response data
+      
+      // Handle both _id and id cases
+      const contributorId = response.data.contributor?.id || 
+                           response.data.contributor?._id ||
+                           response.data.id;
+      
+      if (!contributorId) {
+        console.error('Unexpected response structure:', response.data);
+        throw new Error('Could not extract contributor ID from response');
+      }
+  
+      return contributorId;
+      
+    } catch (error: any) {
+      console.error('Detailed error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        request: error.config
+      });
+      throw new Error(error.response?.data?.message || 'Failed to create contributor');
+    }
   };
-
   const handlePayment = async () => {
     try {
       setIsLoading(true);
       setPaymentError(null);
 
+      if (!isContactInfoComplete()) {
+        const missingFields = [];
+        if (!contactInfo.name.trim()) missingFields.push('name');
+        if (!contactInfo.email.trim()) missingFields.push('email');
+        if (!contactInfo.phone.trim()) missingFields.push('phone');
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactInfo.email)) missingFields.push('valid email');
+        throw new Error(`Please provide ${missingFields.join(', ')}`);
+      }
+
+      console.log('Contact info before payment:', contactInfo);
+
       const totalAmount = amount * numberOfParticipants;
       const preparedParticipants = prepareParticipantData();
 
-      // Data to match backend's expected fields
+      const contributorId = await createContributor();
+
       const paymentData = {
         fullName: contactInfo.name,
         email: contactInfo.email,
         phoneNumber: contactInfo.phone,
         amount: totalAmount,
+        contributorId,
+        collectionId,
       };
 
       console.log('Initiating payment with:', paymentData);
@@ -189,25 +244,15 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
 
               const successData = {
                 collectionId,
+                contributorId,
                 participants: preparedParticipants,
-                paymentMethod: 'Paystack', // Using Paystack as per backend
+                paymentMethod: 'Paystack',
                 totalAmount,
                 contactInfo,
                 transactionRef: reference,
               };
 
               console.log('Payment success with data:', successData);
-
-              // Call Express endpoint to record payment
-              const response = await fetch('/api/payments/record', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(successData),
-              });
-
-              if (!response.ok) {
-                throw new Error('Failed to record payment');
-              }
 
               onPaymentSuccess(successData);
               setIsLoading(false);
@@ -223,7 +268,7 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
             setIsLoading(false);
             toast.info('Payment verification timed out. If you completed the payment, please check your email for confirmation.');
           }
-        }, 300000); // 5 minutes timeout
+        }, 300000);
       } else {
         throw new Error('Failed to get payment URL');
       }
@@ -260,6 +305,7 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
             onChange={(e) => handleContactInfoChange('name', e.target.value)}
             required
             placeholder="Enter your full name"
+            disabled={step !== 'contact'}
           />
         </div>
         <div>
@@ -271,6 +317,7 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
             onChange={(e) => handleContactInfoChange('email', e.target.value)}
             required
             placeholder="Enter your email address"
+            disabled={step !== 'contact'}
           />
         </div>
         <div>
@@ -282,6 +329,7 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
             onChange={(e) => handleContactInfoChange('phone', e.target.value)}
             required
             placeholder="Enter your phone number"
+            disabled={step !== 'contact'}
           />
         </div>
       </div>
