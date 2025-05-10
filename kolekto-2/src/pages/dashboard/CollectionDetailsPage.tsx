@@ -550,6 +550,7 @@ const CollectionDetailsPage: React.FC = () => {
                     ))}
                   </TableBody>
                 </Table>
+                
               ) : (
                 <div className="py-8 text-center text-gray-500">
                   {searchTerm ? "No contributors match your search" : "No contributors yet"}
@@ -572,7 +573,7 @@ const CollectionDetailsPage: React.FC = () => {
               </div>
             </CardHeader>
             <CardContent>
-              {chartData.length > 0 ? (
+              {/* {chartData.length > 0 ? (
                 <div className="h-64 w-full mb-6">
                   <ChartContainer
                     config={{
@@ -604,7 +605,7 @@ const CollectionDetailsPage: React.FC = () => {
                 <div className="h-64 w-full bg-gray-100 rounded-md flex items-center justify-center mb-6">
                   <p className="text-gray-500">No payment activity yet</p>
                 </div>
-              )}
+              )} */}
 
               <h3 className="font-medium mb-4">Recent Contributions</h3>
               {filteredContributors.length > 0 ? (
