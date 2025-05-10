@@ -38,7 +38,7 @@ const createContributor = async (req, res) => {
       success: true,
       message: "Contributor created successfully",
       contributor: {
-        id: contributor._id.toString(), // Ensure we return string ID
+        id: contributor._id.toString(), 
         name: contributor.name,
         email: contributor.email
       }

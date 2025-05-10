@@ -106,25 +106,24 @@ const CreateCollectionForm: React.FC = () => {
       field.id === id ? { ...field, [key]: value } : field
     ));
   };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+  
     if (!authUser) {
       toast.error("You must be logged in to create a collection.");
       navigate('/login');
       return;
     }
-
+  
     const deadlineDate = deadline ? new Date(deadline).toISOString() : null;
     const maxParticipantsValue = isMaxParticipantsEnabled ? parseInt(maxParticipants) : null;
-
+  
     const payload = {
-      collectionTittle: title,
+      collectionTitle: title, // Changed from collectionTittle
       collectionDescription: description || null,
       amount: parseFloat(amount),
-      amountBreakdown: {
-        baseAmount: amount ? parseFloat(amount) : 0,
+      amountBreakdown: { // Make sure this is an object
+        baseAmount: parseFloat(amount),
         kolektoFee,
         paymentGatewayFee,
         totalFees,
@@ -142,7 +141,7 @@ const CreateCollectionForm: React.FC = () => {
       generateUniqueCodes,
       codePrefix: generateUniqueCodes ? codePrefix : null,
     };
-
+  
     await createCollection(payload, navigate);
   };
 

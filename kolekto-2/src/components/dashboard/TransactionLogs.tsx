@@ -6,7 +6,7 @@ import { calculatePlatformChargePercentage, calculateGatewayFee } from '@/utils/
 
 export interface Transaction {
   id: string;
-  type: 'withdrawal' | 'contribution' | 'refund';
+  type: 'withdrawal' | 'contribution' | 'refund' | "payment";
   status: 'pending' | 'successful' | 'failed' | 'paid' | 'processing' | 'completed' | 'cancelled';
   amount: number;
   date: string;
@@ -17,6 +17,8 @@ export interface Transaction {
 interface TransactionLogsProps {
   transactions: Transaction[];
 }
+
+// Removed duplicate Transaction interface declaration
 
 const TransactionLogs: React.FC<TransactionLogsProps> = ({ transactions }) => {
   if (transactions.length === 0) {
