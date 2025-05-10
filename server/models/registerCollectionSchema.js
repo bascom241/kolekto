@@ -1,11 +1,10 @@
 import mongoose from "mongoose";
-
 const formFieldSchema = new mongoose.Schema({
   name: { type: String, required: true },
   type: { type: String, required: true },
   required: { type: Boolean, default: false },
   value: { type: String, default: null },
-});
+}, { _id: false }); // Add this to prevent automatic _id generation for subdocuments
 
 const amountBreakdownSchema = new mongoose.Schema({
   baseAmount: { type: Number, required: true },
@@ -18,7 +17,7 @@ const amountBreakdownSchema = new mongoose.Schema({
     enum: ["organizer", "contributor"],
     required: true,
   },
-});
+}, { _id: false });
 
 const registerCollectionSchema = new mongoose.Schema({
   user: {
@@ -26,7 +25,7 @@ const registerCollectionSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
-  collectionTittle: {
+  collectionTitle: { // Changed from collectionTittle to collectionTitle
     type: String,
     required: true,
     trim: true,
@@ -56,11 +55,11 @@ const registerCollectionSchema = new mongoose.Schema({
     type: String,
     unique: true,
     sparse: true,
+    default: undefined, // This helps with the null duplicate key issue
   },
   createdAt: {
     type: Date,
     default: Date.now,
   },
-});
-
+}, { suppressReservedKeysWarning: true }); // This suppresses the collection warning
 export default mongoose.model("RegisterCollection", registerCollectionSchema);

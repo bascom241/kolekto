@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, Loader2 } from "lucide-react";
 import { usePaymentStore } from '@/store/usePayment';
 import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -56,7 +56,7 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
   const [step, setStep] = useState<'contact' | 'details' | 'payment'>('contact');
   const [numberOfParticipants, setNumberOfParticipants] = useState(1);
   const [participants, setParticipants] = useState<Participant[]>([{ id: '1', data: {} }]);
-  const [paymentMethod, setPaymentMethod] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('Paystack');
   const [isLoading, setIsLoading] = useState(false);
   const [contactInfo, setContactInfo] = useState({
     name: '',
@@ -64,233 +64,200 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
     phone: '',
   });
   const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
+  const [verificationInterval, setVerificationInterval] = useState<NodeJS.Timeout | null>(null);
 
   const { initializePayment, verifyPayment, paymentLoading } = usePaymentStore();
 
+  // Clear interval on unmount
+  useEffect(() => {
+    return () => {
+      if (verificationInterval) {
+        clearInterval(verificationInterval);
+      }
+    };
+  }, [verificationInterval]);
+
   const handleContactInfoChange = (field: string, value: string) => {
-    console.log(`Updating ${field}:`, value);
-    setContactInfo((prev) => ({ ...prev, [field]: value }));
+    setContactInfo(prev => ({ ...prev, [field]: value }));
   };
 
   const handleParticipantsChange = (value: string) => {
     const num = parseInt(value);
-    if (isNaN(num) || num < 1) return;
-    setNumberOfParticipants(num);
-
-    if (num > participants.length) {
-      const newParticipants = [...participants];
-      for (let i = participants.length + 1; i <= num; i++) {
-        newParticipants.push({ id: i.toString(), data: {} });
+    if (isNaN(num)) return;
+    
+    setNumberOfParticipants(Math.max(1, Math.min(10, num))); // Limit to 1-10 participants
+    
+    setParticipants(prev => {
+      if (num > prev.length) {
+        const newParticipants = [...prev];
+        for (let i = prev.length; i < num; i++) {
+          newParticipants.push({ id: (i + 1).toString(), data: {} });
+        }
+        return newParticipants;
       }
-      setParticipants(newParticipants);
-    } else if (num < participants.length) {
-      setParticipants(participants.slice(0, num));
-    }
+      return prev.slice(0, num);
+    });
   };
 
   const handleFieldChange = (participantId: string, fieldName: string, value: string) => {
-    setParticipants(participants.map((participant) =>
-      participant.id === participantId
-        ? { ...participant, data: { ...participant.data, [fieldName]: value } }
-        : participant
-    ));
+    setParticipants(prev =>
+      prev.map(p =>
+        p.id === participantId ? { ...p, data: { ...p.data, [fieldName]: value } } : p
+      )
+    );
   };
 
-  const isContactInfoComplete = () => {
-    return (
-      contactInfo.name.trim() !== '' &&
-      contactInfo.email.trim() !== '' &&
-      contactInfo.phone.trim() !== '' &&
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactInfo.email)
-    );
+  const validateContactInfo = () => {
+    const errors = [];
+    if (!contactInfo.name.trim()) errors.push('Full name is required');
+    if (!contactInfo.email.trim()) errors.push('Email is required');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactInfo.email)) errors.push('Valid email is required');
+    if (!contactInfo.phone.trim()) errors.push('Phone number is required');
+    
+    if (errors.length > 0) {
+      toast.error(errors.join(', '));
+      return false;
+    }
+    return true;
+  };
+
+  const validateParticipantData = () => {
+    for (const participant of participants) {
+      for (const field of fields) {
+        if (field.required && !participant.data[field.name]?.trim()) {
+          toast.error(`Please fill in ${field.name} for all participants`);
+          return false;
+        }
+      }
+    }
+    return true;
   };
 
   const nextStep = () => {
     setPaymentError(null);
-    if (step === 'contact' && isContactInfoComplete()) {
+    if (step === 'contact' && validateContactInfo()) {
       setStep('details');
-    } else if (step === 'details') {
-      const allFieldsFilled = participants.every((participant) =>
-        fields.every(
-          (field) =>
-            !field.required || (participant.data[field.name] && participant.data[field.name].trim() !== '')
-        )
-      );
-      if (allFieldsFilled) {
-        setStep('payment');
-      } else {
-        toast.error('Please fill in all required fields for all participants.');
-      }
+    } else if (step === 'details' && validateParticipantData()) {
+      setStep('payment');
     }
   };
 
   const previousStep = () => {
     setPaymentError(null);
-    if (step === 'details') {
-      setStep('contact');
-    } else if (step === 'payment') {
-      setStep('details');
-    }
+    setStep(step === 'payment' ? 'details' : 'contact');
   };
 
-  const prepareParticipantData = () => {
-    const preparedParticipants = [...participants];
-    if (preparedParticipants.length > 0) {
-      preparedParticipants[0] = {
-        ...preparedParticipants[0],
-        data: {
-          ...preparedParticipants[0].data,
-          'Full Name': contactInfo.name,
-          'Email': contactInfo.email,
-          'Phone': contactInfo.phone,
-        },
-      };
-    }
-    return preparedParticipants;
-  };const createContributor = async () => {
+  const createContributor = async () => {
     try {
-      const contributorData = {
+      const response = await axiosInstance.post(`/collections/${collectionId}/contributors`, {
         name: contactInfo.name,
         email: contactInfo.email,
         phoneNumber: contactInfo.phone,
         amount: amount * numberOfParticipants,
-        collectionId: collectionId // Make sure to include this
-      };
-      
-      console.log('Creating contributor with data:', contributorData);
-      
-      const response = await axiosInstance.post(
-        `/collections/${collectionId}/contributors`,
-        contributorData
-      );
-  
-      console.log('Full response:', response.data); // Log the response data
-      
-      // Handle both _id and id cases
-      const contributorId = response.data.contributor?.id || 
-                           response.data.contributor?._id ||
-                           response.data.id;
-      
-      if (!contributorId) {
-        console.error('Unexpected response structure:', response.data);
-        throw new Error('Could not extract contributor ID from response');
-      }
-  
-      return contributorId;
-      
-    } catch (error: any) {
-      console.error('Detailed error:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        request: error.config
+        collectionId
       });
+
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Failed to create contributor');
+      }
+
+      return response.data.contributor?.id || response.data.contributor?._id;
+    } catch (error: any) {
+      console.error('Create contributor error:', error.response?.data || error.message);
       throw new Error(error.response?.data?.message || 'Failed to create contributor');
     }
   };
-  const handlePayment = async () => {
-    try {
-      setIsLoading(true);
-      setPaymentError(null);
 
-      if (!isContactInfoComplete()) {
-        const missingFields = [];
-        if (!contactInfo.name.trim()) missingFields.push('name');
-        if (!contactInfo.email.trim()) missingFields.push('email');
-        if (!contactInfo.phone.trim()) missingFields.push('phone');
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactInfo.email)) missingFields.push('valid email');
-        throw new Error(`Please provide ${missingFields.join(', ')}`);
+  const startPaymentVerification = async (reference: string) => {
+    const interval = setInterval(async () => {
+      try {
+        const verification = await verifyPayment(reference);
+        
+        if (verification?.status === 'success') {
+          clearInterval(interval);
+          handlePaymentSuccess(reference);
+        }
+      } catch (error) {
+        console.error('Verification error:', error);
       }
+    }, 5000); // Check every 5 seconds
 
-      console.log('Contact info before payment:', contactInfo);
+    setVerificationInterval(interval);
 
-      const totalAmount = amount * numberOfParticipants;
-      const preparedParticipants = prepareParticipantData();
+    // Timeout after 15 minutes
+    setTimeout(() => {
+      clearInterval(interval);
+      if (isLoading) {
+        setIsLoading(false);
+        toast.info('Payment verification timed out. Please check your email for confirmation.');
+      }
+    }, 900000);
+  };
 
+  const handlePaymentSuccess = (reference: string) => {
+    const successData = {
+      collectionId,
+      collectionTitle,
+      // participants: prepareParticipantData(),
+      paymentMethod,
+      totalAmount: amount * numberOfParticipants,
+      contactInfo,
+      transactionRef: reference,
+      timestamp: new Date().toISOString()
+    };
+
+    setIsLoading(false);
+    onPaymentSuccess(successData);
+    toast.success('Payment successful!');
+  };
+
+  const handlePayment = async () => {
+    if (!paymentMethod) {
+      toast.error('Please select a payment method');
+      return;
+    }
+
+    setIsLoading(true);
+    setPaymentError(null);
+
+    try {
+      // 1. Create contributor record
       const contributorId = await createContributor();
-
+      
+      // 2. Initialize payment
       const paymentData = {
         fullName: contactInfo.name,
         email: contactInfo.email,
         phoneNumber: contactInfo.phone,
-        amount: totalAmount,
+        amount: amount * numberOfParticipants,
         contributorId,
         collectionId,
       };
 
-      console.log('Initiating payment with:', paymentData);
-
-      const response = await initializePayment(paymentData);
-
-      if (!response) {
-        throw new Error('Failed to initialize payment');
-      }
-
-      const { authorization_url: authorizationUrl, reference } = response;
-
-      console.log('Payment initiated:', { authorizationUrl, reference });
-
-      if (authorizationUrl) {
-        window.open(authorizationUrl, '_blank');
-
-        const checkInterval = setInterval(async () => {
-          try {
-            console.log('Checking payment status for reference:', reference);
-            const verificationData = await verifyPayment(reference);
-
-            if (verificationData && verificationData.status === 'success') {
-              clearInterval(checkInterval);
-
-              const successData = {
-                collectionId,
-                contributorId,
-                participants: preparedParticipants,
-                paymentMethod: 'Paystack',
-                totalAmount,
-                contactInfo,
-                transactionRef: reference,
-              };
-
-              console.log('Payment success with data:', successData);
-
-              onPaymentSuccess(successData);
-              setIsLoading(false);
-            }
-          } catch (err) {
-            console.error('Error verifying payment:', err);
-          }
-        }, 5000);
-
-        setTimeout(() => {
-          clearInterval(checkInterval);
-          if (isLoading) {
-            setIsLoading(false);
-            toast.info('Payment verification timed out. If you completed the payment, please check your email for confirmation.');
-          }
-        }, 300000);
-      } else {
+      const paymentResponse = await initializePayment(paymentData);
+      
+      if (!paymentResponse?.authorization_url) {
         throw new Error('Failed to get payment URL');
       }
-    } catch (error: any) {
-      console.error('Payment failed:', error);
-      setIsLoading(false);
-      setPaymentError(error.message || 'Payment failed. Please try again.');
-      toast.error(error.message || 'Payment failed. Please try again.');
-      onPaymentError(error.message || 'Payment failed. Please try again.');
-      setRetryCount(prev => prev + 1);
-    }
-  };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!paymentMethod) {
-      toast.error('Please select a payment method.');
-      return;
+      // 3. Open payment gateway
+      const paymentWindow = window.open(paymentResponse.authorization_url, '_blank');
+      
+      if (!paymentWindow) {
+        throw new Error('Please allow popups to proceed with payment');
+      }
+
+      // 4. Start verification process
+      startPaymentVerification(paymentResponse.reference);
+
+    } catch (error: any) {
+      console.error('Payment error:', error);
+      setIsLoading(false);
+      const errorMsg = error.message || 'Payment failed. Please try again.';
+      setPaymentError(errorMsg);
+      onPaymentError(errorMsg);
+      toast.error(errorMsg);
     }
-    setIsLoading(true);
-    setPaymentError(null);
-    handlePayment();
   };
 
   const renderContactForm = () => (
@@ -305,7 +272,6 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
             onChange={(e) => handleContactInfoChange('name', e.target.value)}
             required
             placeholder="Enter your full name"
-            disabled={step !== 'contact'}
           />
         </div>
         <div>
@@ -317,7 +283,6 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
             onChange={(e) => handleContactInfoChange('email', e.target.value)}
             required
             placeholder="Enter your email address"
-            disabled={step !== 'contact'}
           />
         </div>
         <div>
@@ -329,7 +294,6 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
             onChange={(e) => handleContactInfoChange('phone', e.target.value)}
             required
             placeholder="Enter your phone number"
-            disabled={step !== 'contact'}
           />
         </div>
       </div>
@@ -340,12 +304,15 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
     <div className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="numberOfParticipants">Number of Participants</Label>
-        <Select value={numberOfParticipants.toString()} onValueChange={handleParticipantsChange}>
+        <Select 
+          value={numberOfParticipants.toString()} 
+          onValueChange={handleParticipantsChange}
+        >
           <SelectTrigger id="numberOfParticipants" className="w-full">
             <SelectValue placeholder="Select number of participants" />
           </SelectTrigger>
           <SelectContent>
-            {[1, 2, 3, 4, 5].map((num) => (
+            {[1, 2, 3, 4, 5].map(num => (
               <SelectItem key={num} value={num.toString()}>
                 {num} {num === 1 ? 'person' : 'people'}
               </SelectItem>
@@ -360,7 +327,7 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
             {index === 0 ? 'Your Details' : `Participant ${index + 1} Details`}
           </h3>
           <div className="space-y-4">
-            {fields.map((field) => (
+            {fields.map(field => (
               <div key={`${participant.id}-${field.name}`} className="space-y-2">
                 <Label>
                   {field.name}
@@ -390,54 +357,39 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
         </Alert>
       )}
       
-      <h3 className="font-medium mb-4">Choose Payment Method</h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {['Paystack'].map((method) => (
-          <div
-            key={method}
-            className={`border rounded-md p-4 cursor-pointer transition-colors ${
-              paymentMethod === method ? 'border-kolekto bg-kolekto/5' : 'hover:border-gray-300'
-            }`}
-            onClick={() => setPaymentMethod(method)}
-          >
-            <div className="flex items-center">
-              <div
-                className={`w-4 h-4 rounded-full border ${
-                  paymentMethod === method ? 'border-kolekto bg-kolekto' : 'border-gray-300'
-                }`}
-              >
-                {paymentMethod === method && <Check className="h-3 w-3 text-white" />}
-              </div>
-              <span className="ml-2 font-medium">{method}</span>
+      <h3 className="font-medium mb-4">Payment Method</h3>
+      <div className="grid grid-cols-1 gap-3">
+        <div
+          className={`border rounded-md p-4 cursor-pointer transition-colors ${
+            paymentMethod === 'Paystack' ? 'border-kolekto bg-kolekto/5' : 'hover:border-gray-300'
+          }`}
+          onClick={() => setPaymentMethod('Paystack')}
+        >
+          <div className="flex items-center">
+            <div
+              className={`w-4 h-4 rounded-full border ${
+                paymentMethod === 'Paystack' ? 'border-kolekto bg-kolekto' : 'border-gray-300'
+              }`}
+            >
+              {paymentMethod === 'Paystack' && <Check className="h-3 w-3 text-white" />}
             </div>
+            <span className="ml-2 font-medium">Paystack (Cards, Bank Transfer, USSD)</span>
           </div>
-        ))}
+        </div>
       </div>
       
-      {retryCount > 0 && (
-        <div className="mt-4 text-sm text-gray-600">
-          <p>If you're experiencing issues with payment:</p>
-          <ul className="list-disc pl-5 mt-1">
-            <li>Make sure you have sufficient funds in your account</li>
-            <li>Check that your bank allows online transactions</li>
-            <li>Try refreshing the page and attempting again</li>
-            <li>Contact support if the problem persists</li>
-          </ul>
-        </div>
-      )}
+      <div className="mt-4 text-sm text-gray-600">
+        <p>Secure payment processing powered by Paystack</p>
+      </div>
     </div>
   );
 
   const getStepContent = () => {
     switch (step) {
-      case 'contact':
-        return renderContactForm();
-      case 'details':
-        return renderParticipantForm();
-      case 'payment':
-        return renderPaymentForm();
-      default:
-        return null;
+      case 'contact': return renderContactForm();
+      case 'details': return renderParticipantForm();
+      case 'payment': return renderPaymentForm();
+      default: return null;
     }
   };
 
@@ -449,7 +401,6 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
             type="button"
             onClick={nextStep}
             className="w-full bg-kolekto hover:bg-kolekto/90"
-            disabled={!isContactInfoComplete()}
           >
             Continue
             <ArrowRight className="ml-2 h-4 w-4" />
@@ -475,13 +426,19 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
         return (
           <div className="flex flex-col gap-2 w-full">
             <Button
-              type="submit"
+              type="button"
+              onClick={handlePayment}
               className="w-full bg-kolekto hover:bg-kolekto/90"
-              disabled={isLoading || paymentLoading || !paymentMethod}
+              disabled={isLoading || paymentLoading}
             >
-              {isLoading || paymentLoading
-                ? 'Processing...'
-                : `Pay ₦${(amount * numberOfParticipants).toLocaleString()}`}
+              {(isLoading || paymentLoading) ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                `Pay ₦${(amount * numberOfParticipants).toLocaleString()}`
+              )}
             </Button>
             <Button
               type="button"
@@ -499,7 +456,7 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>{collectionTitle}</CardTitle>
@@ -519,7 +476,7 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
           {getStepActions()}
         </CardFooter>
       </Card>
-    </form>
+    </div>
   );
 };
 

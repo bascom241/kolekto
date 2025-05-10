@@ -3,40 +3,12 @@ import { axiosInstance } from "@/lib/axios";
 import { toast } from "sonner";
 import { NavigateFunction } from "react-router-dom";
 
-interface FormField {
-  name: string;
-  type: string;
-  required: boolean;
-  value: null | string;
-}
-
-interface AmountBreakdown {
-  baseAmount: number;
-  kolektoFee: number;
-  paymentGatewayFee: number;
-  totalFees: number;
-  totalPayable: number;
-  feeBearer: "organizer" | "contributor";
-}
-
-interface CollectionFormData {
-  collectionTittle: string;
-  collectionDescription: string | null;
-  amount: number;
-  amountBreakdown: AmountBreakdown;
-  deadline: string | null;
-  numberOfParticipants: number | null;
-  participantInformation: FormField[];
-  generateUniqueCodes: boolean;
-  codePrefix: string | null;
-}
-
 interface Collection {
   id: string;
   title: string;
   description?: string;
   amount: number;
-  deadline: string;
+  deadline: string | null;
   status: "active" | "expired" | "completed";
   participants_count: number;
   max_participants?: number;
@@ -54,94 +26,90 @@ interface Contributor {
 }
 
 interface CollectionState {
-  isCreating: boolean;
+  collections: Collection[];
+  contributors: Contributor[];
+  selectedCollection: Collection | null;
   isLoading: boolean;
+  isCreating: boolean; // Added this line
   isContributorsLoading: boolean;
   error: string | null;
   contributorsError: string | null;
-  collections: Collection[];
-  selectedCollection: Collection | null;
-  contributors: Contributor[];
-  createCollection: (formData: CollectionFormData, navigate: NavigateFunction) => Promise<void>;
   fetchCollections: () => Promise<void>;
   fetchCollection: (id: string) => Promise<void>;
   fetchContributors: (collectionId: string) => Promise<void>;
+  createCollection: (data: any, navigate: NavigateFunction) => Promise<void>;
 }
 
 export const useCollectionStore = create<CollectionState>((set) => ({
-  isCreating: false,
+  collections: [],
+  contributors: [],
+  selectedCollection: null,
   isLoading: false,
+  isCreating: false, // Added this line
   isContributorsLoading: false,
   error: null,
   contributorsError: null,
-  collections: [],
-  selectedCollection: null,
-  contributors: [],
-  createCollection: async (formData, navigate) => {
-    set({ isCreating: true });
-    try {
-      const response = await axiosInstance.post("/collections/create", formData);
-      set({ isCreating: false });
-      toast.success(response.data.message);
-      navigate("/dashboard/collections");
-    } catch (error) {
-      set({ isCreating: false });
-      if (error instanceof Error) {
-        console.error("Collection creation failed:", error);
-        toast.error(error.message || "Failed to create collection");
-      } else {
-        toast.error("An unexpected error occurred");
-      }
-    }
-  },
+
   fetchCollections: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await axiosInstance.get("/collections");
-      set({
-        isLoading: false,
-        collections: response.data.collections,
-        error: null,
+      const { data } = await axiosInstance.get("/collections");
+      set({ 
+        collections: data.collections,
+        isLoading: false 
       });
-    } catch (error) {
-      set({ isLoading: false });
-      const errorMessage = error instanceof Error ? error.message : "Failed to fetch collections";
-      set({ error: errorMessage });
-      toast.error(errorMessage);
+    } catch (error: any) {
+      const message = error.response?.data?.message || "Failed to fetch collections";
+      set({ error: message, isLoading: false });
+      toast.error(message);
     }
   },
+
   fetchCollection: async (id: string) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await axiosInstance.get(`/collections/collection/${id}`);
-      set({
-        isLoading: false,
-        selectedCollection: response.data.collection,
-        error: null,
+      const { data } = await axiosInstance.get(`/collections/collection/${id}`);
+      set({ 
+        selectedCollection: data.collection,
+        isLoading: false 
       });
-    } catch (error) {
-      set({ isLoading: false });
-      const errorMessage = error instanceof Error ? error.message : "Failed to fetch collection";
-      set({ error: errorMessage, selectedCollection: null });
-      toast.error(errorMessage);
-      console.log(error);
+    } catch (error: any) {
+      const message = error.response?.data?.message || "Failed to fetch collection";
+      set({ error: message, isLoading: false, selectedCollection: null });
+      toast.error(message);
     }
   },
+
   fetchContributors: async (collectionId: string) => {
     set({ isContributorsLoading: true, contributorsError: null });
     try {
-      const response = await axiosInstance.get(`/collections/${collectionId}/contributors`);
+      const { data } = await axiosInstance.get(`/collections/${collectionId}/contributors`);
       set({
-        isContributorsLoading: false,
-        contributors: response.data.contributors,
-        contributorsError: null,
+        contributors: data.contributors,
+        isContributorsLoading: false
       });
-    } catch (error) {
-      set({ isContributorsLoading: false });
-      const errorMessage = error instanceof Error ? error.message : "Failed to fetch contributors";
-      set({ contributorsError: errorMessage, contributors: [] });
-      toast.error(errorMessage);
-      console.log(error);
+    } catch (error: any) {
+      const message = error.response?.data?.message || "Failed to fetch contributors";
+      set({ 
+        contributorsError: message, 
+        isContributorsLoading: false,
+        contributors: [] 
+      });
+      toast.error(message);
     }
   },
+
+  createCollection: async (formData, navigate) => {
+    set({ isCreating: true }); // Changed from isLoading to isCreating
+    try {
+      const { data } = await axiosInstance.post("/collections/create", formData);
+      toast.success(data.message);
+      navigate("/dashboard/collections");
+      set({ isCreating: false });
+    } catch (error: any) {
+      const message = error.response?.data?.message || "Failed to create collection";
+      set({ error: message, isCreating: false });
+      toast.error(message);
+    }
+  }
 }));

@@ -1,13 +1,12 @@
 import RegisterCollection from "../models/registerCollectionSchema.js";
 import Contributor from "../models/contributorSchema.js";
-
 const createCollection = async (req, res) => {
   try {
     const {
-      collectionTittle,
+      collectionTitle, // Changed from collectionTittle
       collectionDescription,
       amount,
-      amountBreakdown,
+      amountBreakdown, // Make sure this is an object
       deadline,
       numberOfParticipants,
       participantInformation,
@@ -15,30 +14,37 @@ const createCollection = async (req, res) => {
       codePrefix,
     } = req.body;
 
-    const requiredFields = ["collectionTittle", "amount", "amountBreakdown", "numberOfParticipants"];
+    // Validate required fields
+    const requiredFields = ["collectionTitle", "amount", "amountBreakdown"];
     const missingFields = requiredFields.filter((field) => !req.body[field]);
 
     if (missingFields.length > 0) {
-      return res.status(400).json({ success: false, message: `Please provide ${missingFields.join(", ")}` });
+      return res.status(400).json({ 
+        success: false, 
+        message: `Please provide ${missingFields.join(", ")}` 
+      });
     }
 
+    // Validate participant information
     if (participantInformation && Array.isArray(participantInformation)) {
       for (const field of participantInformation) {
-        if (!field.name) {
+        if (!field.name || !field.type) {
           return res.status(400).json({
             success: false,
-            message: "Each participant information field must have a 'name'",
+            message: "Each participant information field must have a 'name' and 'type'",
           });
         }
       }
     }
 
     let collectionCode = null;
-    if (generateUniqueCodes && codePrefix) {
+    if (generateUniqueCodes) {
       let attempts = 0;
       const maxAttempts = 10;
       while (attempts < maxAttempts) {
-        collectionCode = `${codePrefix}-${Math.floor(10000 + Math.random() * 90000)}`;
+        const randomSuffix = Math.floor(10000 + Math.random() * 90000);
+        collectionCode = codePrefix ? `${codePrefix}${randomSuffix}` : `COL-${randomSuffix}`;
+        
         const existing = await RegisterCollection.findOne({ code: collectionCode });
         if (!existing) {
           break;
@@ -55,24 +61,31 @@ const createCollection = async (req, res) => {
 
     const collection = new RegisterCollection({
       user: req.user?.userId,
-      collectionTittle,
+      collectionTitle,
       collectionDescription,
       amount,
-      amountBreakdown,
-      deadline,
-      numberOfParticipants,
-      participantInformation,
-      code: collectionCode,
+      amountBreakdown, // This should be the full amountBreakdown object
+      deadline: deadline ? new Date(deadline) : null,
+      numberOfParticipants: numberOfParticipants || null,
+      participantInformation: participantInformation || [],
+      code: collectionCode || undefined, // Use undefined instead of null
     });
 
     await collection.save();
-    res.status(201).json({ success: true, message: "Collection created successfully", collection });
+    
+    res.status(201).json({ 
+      success: true, 
+      message: "Collection created successfully", 
+      collection 
+    });
   } catch (error) {
     console.error("Error in createCollection:", error);
-    res.status(500).json({ success: false, message: error.message || "Internal server error" });
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || "Internal server error" 
+    });
   }
 };
-
 const editCollection = async (req, res) => {
   try {
     const { collectionTittle, collectionDescription, deadline, numberOfParticipants } = req.body;

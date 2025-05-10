@@ -1,17 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Wallet } from "lucide-react";
+import { Wallet, Loader2 } from "lucide-react";
 import { WithdrawFundsDialog } from "@/components/withdrawals/WithdrawFundsDialog";
 import { toast } from "sonner";
 import TransactionLogs from "@/components/dashboard/TransactionLogs";
 import { useAuth } from "@/context/AuthContext";
 import { useTransactions } from "@/store/useTransaction";
-import { Loader2 } from "lucide-react";
-interface Transaction {
-  type: "withdrawal" | "contribution" | "refund" | "payment";
-  // other properties...
-}
 import {
   Table,
   TableBody,
@@ -21,154 +16,169 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+interface Collection {
+  id: string;
+  title: string;
+  amount: number;
+  total_raised: number;
+  participants_count: number;
+}
+
 interface Transaction {
   id: string;
   type: "withdrawal" | "contribution" | "refund" | "payment";
   status: "pending" | "successful" | "failed";
   amount: number;
   date: string;
-  collection: string;
+  collection?: string;
   description?: string;
   contributor?: string;
-}
-
-interface Collection {
-  id: string;
-  title: string;
-  amount: number;
-  total_raised: number;
-}
-
-interface Withdrawal {
-  id: string;
-  status: "pending" | "successful" | "failed";
-  amount: number;
-  created_at: string;
-  collections?: { title: string };
-  reason_if_failed?: string;
-}
-
-interface Payment {
-  id: string;
-  fullName: string;
-  email: string;
-  phoneNumber: string;
-  amount: number;
-  paymentReference: string;
-  status: "pending" | "successful" | "failed";
-  contributor: { name: string; email: string } | null;
-  collection: string;
-  created_at: string;
 }
 
 const TransactionHistoryPage: React.FC = () => {
   const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null);
   const { user } = useAuth();
-  const { fetchCollections, fetchPayments, fetchWithdrawals, submitWithdrawal } = useTransactions();
+  const {
+    fetchCollections,
+    fetchPayments,
+    fetchWithdrawals,
+    submitWithdrawal
+  } = useTransactions();
 
   const [collections, setCollections] = useState<Collection[]>([]);
+  interface Payment {
+    id: string;
+    status: "pending" | "successful" | "failed";
+    amount: number;
+    created_at: string;
+    collection?: string;
+    contributor?: {
+      name: string;
+      email: string;
+    };
+  }
+
   const [payments, setPayments] = useState<Payment[]>([]);
+  interface Withdrawal {
+    id: string;
+    status: "pending" | "successful" | "failed";
+    amount: number;
+    created_at: string;
+    reason_if_failed?: string;
+    collections?: {
+      title: string;
+    };
+  }
+
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
-  const [collectionsLoading, setCollectionsLoading] = useState(false);
-  const [paymentsLoading, setPaymentsLoading] = useState(false);
-  const [withdrawalsLoading, setWithdrawalsLoading] = useState(false);
+  const [loading, setLoading] = useState({
+    collections: false,
+    payments: false,
+    withdrawals: false
+  });
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
-      if (!user?.id) {
-        setError("User not authenticated");
-        return;
+      if (!user?.id) return;
+
+      try {
+        setLoading(prev => ({ ...prev, collections: true }));
+        const collectionsResponse = await fetchCollections(user.id);
+        if (collectionsResponse.error) throw new Error(collectionsResponse.error);
+        setCollections(
+          collectionsResponse.data.map((item: any) => ({
+            id: item.id,
+            title: item.title,
+            amount: item.amount,
+            total_raised: item.total_raised,
+            participants_count: item.participants_count || 0, // Ensure participants_count is present
+          }))
+        );
+
+        setLoading(prev => ({ ...prev, payments: true }));
+        const paymentsResponse = await fetchPayments(user.id);
+        if (paymentsResponse.error) throw new Error(paymentsResponse.error);
+        setPayments(paymentsResponse.data);
+
+        setLoading(prev => ({ ...prev, withdrawals: true }));
+        const withdrawalsResponse = await fetchWithdrawals(user.id);
+        if (withdrawalsResponse.error) throw new Error(withdrawalsResponse.error);
+        setWithdrawals(withdrawalsResponse.data);
+
+      } catch (err: any) {
+        setError(err.message || "Failed to load transaction data");
+        toast.error(err.message || "Failed to load transaction data");
+      } finally {
+        setLoading({
+          collections: false,
+          payments: false,
+          withdrawals: false
+        });
       }
-
-      // Fetch collections
-      setCollectionsLoading(true);
-      const collectionsResult = await fetchCollections(user.id);
-      setCollections(collectionsResult.data);
-      if (collectionsResult.error) setError((prev) => prev || collectionsResult.error);
-      setCollectionsLoading(false);
-
-      // Fetch payments
-      setPaymentsLoading(true);
-      const paymentsResult = await fetchPayments(user.id);
-      setPayments(paymentsResult.data);
-      if (paymentsResult.error) setError((prev) => prev || paymentsResult.error);
-      setPaymentsLoading(false);
-
-      // Fetch withdrawals
-      setWithdrawalsLoading(true);
-      const withdrawalsResult = await fetchWithdrawals(user.id);
-      setWithdrawals(withdrawalsResult.data);
-      if (withdrawalsResult.error) setError((prev) => prev || withdrawalsResult.error);
-      setWithdrawalsLoading(false);
     };
 
     loadData();
-  }, [user?.id, fetchCollections, fetchPayments, fetchWithdrawals]);
+  }, [user?.id]);
 
-  // Calculate total earnings across all collections based on their actual total_raised value
-  const totalEarnings = collections.reduce((total, collection) => {
-    return total + (collection.total_raised || 0);
+  // Calculate total earnings (90% of total raised across all collections)
+  const totalEarnings = collections.reduce((sum, collection) => {
+    return sum + (collection.total_raised || 0) * 0.9;
   }, 0);
 
-  // Prepare collection earnings data for the table using the actual total_raised values
-  const collectionEarnings = collections.map((collection) => {
-    // Calculate withdrawable amount (90% of total raised)
-    const withdrawable = (collection.total_raised || 0) * 0.9;
-
-    return {
-      id: collection.id,
-      title: collection.title,
-      amount: collection.amount,
-      total_raised: collection.total_raised || 0,
-      totalCollected: collection.total_raised || 0,
-      withdrawable,
-    };
-  });
-
-  // Process payment data for the transaction logs
-  const formattedPayments: Transaction[] = payments.map((payment) => ({
-    id: payment.id,
-    type: "payment",
-    status: payment.status,
-    amount: payment.amount,
-    date: payment.created_at,
-    collection: payment.collection,
-    contributor: payment.contributor
-      ? `${payment.contributor.name} (${payment.contributor.email})`
-      : "Unknown",
+  // Prepare collection earnings data
+  const collectionEarnings = collections.map(collection => ({
+    id: collection.id,
+    title: collection.title,
+    amount: collection.amount,
+    total_raised: collection.total_raised || 0,
+    participants_count: collection.participants_count || 0,
+    withdrawable: (collection.total_raised || 0) * 0.9
   }));
 
-  // Process withdrawal data for the transaction logs
-  const formattedWithdrawals: Transaction[] = withdrawals.map((withdrawal) => ({
-    id: withdrawal.id,
-    type: "withdrawal",
-    status: withdrawal.status,
-    amount: withdrawal.amount,
-    date: withdrawal.created_at,
-    collection: withdrawal.collections?.title || "Unknown Collection",
-    description: withdrawal.reason_if_failed,
-  }));
+  // Format transactions data for TransactionLogs component
+  const formatTransactions = (): Transaction[] => {
+    const formattedPayments = payments.map(payment => ({
+      id: payment.id,
+      type: "payment" as const,
+      status: payment.status,
+      amount: payment.amount,
+      date: payment.created_at,
+      collection: payment.collection || "Unknown Collection",
+      contributor: payment.contributor 
+        ? `${payment.contributor.name} (${payment.contributor.email})`
+        : "Unknown"
+    }));
 
-  // Combine payments and withdrawals, sort by date (newest first)
-  const allTransactions = [...formattedPayments, ...formattedWithdrawals].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
+    const formattedWithdrawals = withdrawals.map(withdrawal => ({
+      id: withdrawal.id,
+      type: "withdrawal" as const,
+      status: withdrawal.status,
+      amount: withdrawal.amount,
+      date: withdrawal.created_at,
+      description: withdrawal.reason_if_failed,
+      collection: withdrawal.collections?.title || "Unknown Collection"
+    }));
+
+    return [...formattedPayments, ...formattedWithdrawals].sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  };
 
   const handleWithdraw = (collection: Collection) => {
     setSelectedCollection(collection);
     setIsWithdrawDialogOpen(true);
   };
 
-  const onWithdrawComplete = async (data: {
+  const handleWithdrawalSubmit = async (data: {
     amount: number;
     accountName: string;
     accountNumber: string;
     bankName: string;
   }) => {
     if (!user?.id || !selectedCollection) {
-      toast.error("Unable to process withdrawal. Please try again.");
+      toast.error("Unable to process withdrawal");
       return;
     }
 
@@ -179,93 +189,101 @@ const TransactionHistoryPage: React.FC = () => {
         amount: data.amount,
         account_name: data.accountName,
         account_number: data.accountNumber,
-        bank_name: data.bankName,
+        bank_name: data.bankName
       });
 
+      toast.success("Withdrawal request submitted");
       setIsWithdrawDialogOpen(false);
-      // Refresh withdrawals
-      setWithdrawalsLoading(true);
-      const withdrawalsResult = await fetchWithdrawals(user.id);
-      setWithdrawals(withdrawalsResult.data);
-      setWithdrawalsLoading(false);
-      toast.success("Withdrawal request submitted successfully");
-    } catch (error: any) {
-      console.error("Withdrawal error:", error);
-      toast.error(error.message || "Failed to submit withdrawal request");
+      
+      // Refresh withdrawals data
+      setLoading(prev => ({ ...prev, withdrawals: true }));
+      const withdrawalsResponse = await fetchWithdrawals(user.id);
+      if (withdrawalsResponse.error) throw new Error(withdrawalsResponse.error);
+      setWithdrawals(withdrawalsResponse.data);
+      setLoading(prev => ({ ...prev, withdrawals: false }));
+
+    } catch (err: any) {
+      toast.error(err.message || "Withdrawal failed");
     }
   };
 
-  const isLoading = collectionsLoading || paymentsLoading || withdrawalsLoading;
+  const isLoading = loading.collections || loading.payments || loading.withdrawals;
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center py-10">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-500 mr-2" />
-        <p className="text-gray-500">Loading transaction data...</p>
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin mr-2" />
+        <span>Loading transaction history...</span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="py-10 text-center text-gray-500">
-        <h2 className="text-2xl font-bold text-gray-700 mb-4">Error Loading Transactions</h2>
-        <p className="text-gray-600 mb-6">
-          Failed to load transaction data: {error}. Please try again or contact support.
-        </p>
-        <Button
-          onClick={() => window.location.reload()}
-          className="bg-kolekto hover:bg-kolekto/90"
-        >
-          Retry
-        </Button>
+      <div className="py-10 text-center">
+        <h2 className="text-xl font-bold mb-2">Error Loading Data</h2>
+        <p className="text-gray-600 mb-4">{error}</p>
+        <Button onClick={() => window.location.reload()}>Try Again</Button>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold mb-6">Transaction History</h1>
+      <h1 className="text-2xl font-bold">Transaction History</h1>
 
+      {/* Total Earnings Card */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-medium">Total Earnings</CardTitle>
+          <CardTitle className="text-lg">Total Withdrawable Earnings</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-2xl font-bold text-green-600">₦{totalEarnings.toLocaleString()}</p>
-          <p className="text-sm text-gray-500">Total amount collected across all collections</p>
+          <div className="text-3xl font-bold text-green-600">
+            ₦{totalEarnings.toLocaleString()}
+          </div>
+          <p className="text-sm text-gray-500 mt-1">
+            Total amount available for withdrawal (90% of total collected)
+          </p>
         </CardContent>
       </Card>
 
+      {/* Collections Earnings Table */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-medium">Earnings per Collection</CardTitle>
+          <CardTitle className="text-lg">Collection Earnings</CardTitle>
         </CardHeader>
         <CardContent>
-          {collectionEarnings.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Collection</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Total Collected</TableHead>
-                  <TableHead>Withdrawable</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {collectionEarnings.map((collection) => (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Collection</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Participants</TableHead>
+                <TableHead>Total Collected</TableHead>
+                <TableHead>Withdrawable</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {collectionEarnings.length > 0 ? (
+                collectionEarnings.map(collection => (
                   <TableRow key={collection.id}>
                     <TableCell className="font-medium">{collection.title}</TableCell>
                     <TableCell>₦{collection.amount.toLocaleString()}</TableCell>
-                    <TableCell>₦{collection.totalCollected.toLocaleString()}</TableCell>
+                    <TableCell>{collection.participants_count}</TableCell>
+                    <TableCell>₦{collection.total_raised.toLocaleString()}</TableCell>
                     <TableCell>₦{collection.withdrawable.toLocaleString()}</TableCell>
                     <TableCell>
                       <Button
-                        onClick={() => handleWithdraw(collection)}
-                        variant="outline"
                         size="sm"
-                        className="flex items-center"
+                        variant="outline"
+                        onClick={() => handleWithdraw({
+                          id: collection.id,
+                          title: collection.title,
+                          amount: collection.amount,
+                          total_raised: collection.total_raised,
+                          participants_count: collection.participants_count
+                        })}
                         disabled={collection.withdrawable <= 0}
                       >
                         <Wallet className="mr-2 h-4 w-4" />
@@ -273,25 +291,36 @@ const TransactionHistoryPage: React.FC = () => {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="py-6 text-center text-gray-500">
-              <p>No collections with earnings found</p>
-            </div>
-          )}
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                    No collections found
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
-      <TransactionLogs transactions={allTransactions.filter((transaction): transaction is Transaction & { type: "withdrawal" | "contribution" | "refund" } => transaction.type !== "payment")} />
+      {/* Transaction Logs */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Transactions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <TransactionLogs transactions={formatTransactions()} />
+        </CardContent>
+      </Card>
 
+      {/* Withdrawal Dialog */}
       {selectedCollection && (
         <WithdrawFundsDialog
           open={isWithdrawDialogOpen}
           onOpenChange={setIsWithdrawDialogOpen}
-          onComplete={onWithdrawComplete}
-          availableBalance={(selectedCollection.total_raised || 0) * 0.9}
+          onComplete={handleWithdrawalSubmit}
+          availableBalance={selectedCollection.total_raised * 0.9}
           collectionId={selectedCollection.id}
           collectionTitle={selectedCollection.title}
         />
