@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,8 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ArrowRight, Check, Loader2 } from "lucide-react";
-import { usePaymentStore } from '@/store/usePayment';
-import { toast } from 'sonner';
+import { usePaymentStore } from "@/store/usePayment";
+import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { axiosInstance } from "@/lib/axios";
 
@@ -53,20 +53,26 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
   onPaymentSuccess,
   onPaymentError,
 }) => {
-  const [step, setStep] = useState<'contact' | 'details' | 'payment'>('contact');
+  const [step, setStep] = useState<"contact" | "details" | "payment">(
+    "contact"
+  );
   const [numberOfParticipants, setNumberOfParticipants] = useState(1);
-  const [participants, setParticipants] = useState<Participant[]>([{ id: '1', data: {} }]);
-  const [paymentMethod, setPaymentMethod] = useState('Paystack');
+  const [participants, setParticipants] = useState<Participant[]>([
+    { id: "1", data: {} },
+  ]);
+  const [paymentMethod, setPaymentMethod] = useState("Paystack");
   const [isLoading, setIsLoading] = useState(false);
   const [contactInfo, setContactInfo] = useState({
-    name: '',
-    email: '',
-    phone: '',
+    name: "",
+    email: "",
+    phone: "",
   });
   const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [verificationInterval, setVerificationInterval] = useState<NodeJS.Timeout | null>(null);
+  const [verificationInterval, setVerificationInterval] =
+    useState<NodeJS.Timeout | null>(null);
 
-  const { initializePayment, verifyPayment, paymentLoading } = usePaymentStore();
+  const { initializePayment, verifyPayment, paymentLoading } =
+    usePaymentStore();
 
   // Clear interval on unmount
   useEffect(() => {
@@ -78,16 +84,16 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
   }, [verificationInterval]);
 
   const handleContactInfoChange = (field: string, value: string) => {
-    setContactInfo(prev => ({ ...prev, [field]: value }));
+    setContactInfo((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleParticipantsChange = (value: string) => {
     const num = parseInt(value);
     if (isNaN(num)) return;
-    
+
     setNumberOfParticipants(Math.max(1, Math.min(10, num))); // Limit to 1-10 participants
-    
-    setParticipants(prev => {
+
+    setParticipants((prev) => {
       if (num > prev.length) {
         const newParticipants = [...prev];
         for (let i = prev.length; i < num; i++) {
@@ -99,31 +105,45 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
     });
   };
 
-  const handleFieldChange = (participantId: string, fieldName: string, value: string) => {
-    setParticipants(prev =>
-      prev.map(p =>
-        p.id === participantId ? { ...p, data: { ...p.data, [fieldName]: value } } : p
+  const handleFieldChange = (
+    participantId: string,
+    fieldName: string,
+    value: string
+  ) => {
+    console.log("paying");
+
+    setParticipants((prev) =>
+      prev.map((p) =>
+        p.id === participantId
+          ? { ...p, data: { ...p.data, [fieldName]: value } }
+          : p
       )
     );
   };
 
   const validateContactInfo = () => {
     const errors = [];
-    if (!contactInfo.name.trim()) errors.push('Full name is required');
-    if (!contactInfo.email.trim()) errors.push('Email is required');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactInfo.email)) errors.push('Valid email is required');
-    if (!contactInfo.phone.trim()) errors.push('Phone number is required');
-    
+    if (!contactInfo.name.trim()) errors.push("Full name is required");
+    if (!contactInfo.email.trim()) errors.push("Email is required");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactInfo.email))
+      errors.push("Valid email is required");
+    if (!contactInfo.phone.trim()) errors.push("Phone number is required");
+
     if (errors.length > 0) {
-      toast.error(errors.join(', '));
+      toast.error(errors.join(", "));
       return false;
     }
     return true;
   };
 
+  console.log(fields[0]);
+  // console.log(participants);
+
   const validateParticipantData = () => {
     for (const participant of participants) {
       for (const field of fields) {
+        if (field.required && field.name.toLowerCase() === "unique code")
+          return true; // Skip validation for unique code
         if (field.required && !participant.data[field.name]?.trim()) {
           toast.error(`Please fill in ${field.name} for all participants`);
           return false;
@@ -135,36 +155,49 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
 
   const nextStep = () => {
     setPaymentError(null);
-    if (step === 'contact' && validateContactInfo()) {
-      setStep('details');
-    } else if (step === 'details' && validateParticipantData()) {
-      setStep('payment');
+    if (step === "contact" && validateContactInfo()) {
+      setStep("details");
+    } else if (step === "details" && validateParticipantData()) {
+      setStep("payment");
     }
   };
 
   const previousStep = () => {
     setPaymentError(null);
-    setStep(step === 'payment' ? 'details' : 'contact');
+    setStep(step === "payment" ? "details" : "contact");
   };
 
   const createContributor = async () => {
     try {
-      const response = await axiosInstance.post(`/collections/${collectionId}/contributors`, {
-        name: contactInfo.name,
-        email: contactInfo.email,
-        phoneNumber: contactInfo.phone,
-        amount: amount * numberOfParticipants,
-        collectionId
-      });
+      const response = await axiosInstance.post(
+        `/collections/${collectionId}/contributors`,
+        {
+          name: contactInfo.name,
+          email: contactInfo.email,
+          phoneNumber: contactInfo.phone,
+          amount: amount * numberOfParticipants,
+          participantInformation: participants.map((participant) => ({
+            ...participant.data,
+          })),
+          collectionId,
+        }
+      );
 
       if (!response.data.success) {
-        throw new Error(response.data.message || 'Failed to create contributor');
+        throw new Error(
+          response.data.message || "Failed to create contributor"
+        );
       }
 
       return response.data.contributor?.id || response.data.contributor?._id;
     } catch (error: any) {
-      console.error('Create contributor error:', error.response?.data || error.message);
-      throw new Error(error.response?.data?.message || 'Failed to create contributor');
+      console.error(
+        "Create contributor error:",
+        error.response?.data || error.message
+      );
+      throw new Error(
+        error.response?.data?.message || "Failed to create contributor"
+      );
     }
   };
 
@@ -172,13 +205,13 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
     const interval = setInterval(async () => {
       try {
         const verification = await verifyPayment(reference);
-        
-        if (verification?.status === 'success') {
+
+        if (verification?.status === "success") {
           clearInterval(interval);
           handlePaymentSuccess(reference);
         }
       } catch (error) {
-        console.error('Verification error:', error);
+        console.error("Verification error:", error);
       }
     }, 5000); // Check every 5 seconds
 
@@ -189,7 +222,9 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
       clearInterval(interval);
       if (isLoading) {
         setIsLoading(false);
-        toast.info('Payment verification timed out. Please check your email for confirmation.');
+        toast.info(
+          "Payment verification timed out. Please check your email for confirmation."
+        );
       }
     }, 900000);
   };
@@ -203,17 +238,17 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
       totalAmount: amount * numberOfParticipants,
       contactInfo,
       transactionRef: reference,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     setIsLoading(false);
     onPaymentSuccess(successData);
-    toast.success('Payment successful!');
+    toast.success("Payment successful!");
   };
 
   const handlePayment = async () => {
     if (!paymentMethod) {
-      toast.error('Please select a payment method');
+      toast.error("Please select a payment method");
       return;
     }
 
@@ -223,7 +258,7 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
     try {
       // 1. Create contributor record
       const contributorId = await createContributor();
-      
+
       // 2. Initialize payment
       const paymentData = {
         fullName: contactInfo.name,
@@ -235,25 +270,27 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
       };
 
       const paymentResponse = await initializePayment(paymentData);
-      
+
       if (!paymentResponse?.authorization_url) {
-        throw new Error('Failed to get payment URL');
+        throw new Error("Failed to get payment URL");
       }
 
       // 3. Open payment gateway
-      const paymentWindow = window.open(paymentResponse.authorization_url, '_blank');
-      
+      const paymentWindow = window.open(
+        paymentResponse.authorization_url,
+        "_blank"
+      );
+
       if (!paymentWindow) {
-        throw new Error('Please allow popups to proceed with payment');
+        throw new Error("Please allow popups to proceed with payment");
       }
 
       // 4. Start verification process
       startPaymentVerification(paymentResponse.reference);
-
     } catch (error: any) {
-      console.error('Payment error:', error);
+      console.error("Payment error:", error);
       setIsLoading(false);
-      const errorMsg = error.message || 'Payment failed. Please try again.';
+      const errorMsg = error.message || "Payment failed. Please try again.";
       setPaymentError(errorMsg);
       onPaymentError(errorMsg);
       toast.error(errorMsg);
@@ -269,7 +306,7 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
           <Input
             id="name"
             value={contactInfo.name}
-            onChange={(e) => handleContactInfoChange('name', e.target.value)}
+            onChange={(e) => handleContactInfoChange("name", e.target.value)}
             required
             placeholder="Enter your full name"
           />
@@ -280,7 +317,7 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
             id="email"
             type="email"
             value={contactInfo.email}
-            onChange={(e) => handleContactInfoChange('email', e.target.value)}
+            onChange={(e) => handleContactInfoChange("email", e.target.value)}
             required
             placeholder="Enter your email address"
           />
@@ -291,7 +328,7 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
             id="phone"
             type="tel"
             value={contactInfo.phone}
-            onChange={(e) => handleContactInfoChange('phone', e.target.value)}
+            onChange={(e) => handleContactInfoChange("phone", e.target.value)}
             required
             placeholder="Enter your phone number"
           />
@@ -302,7 +339,7 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
 
   const renderParticipantForm = () => (
     <div className="space-y-4">
-      <div className="space-y-2">
+      {/* <div className="space-y-2">
         <Label htmlFor="numberOfParticipants">Number of Participants</Label>
         <Select 
           value={numberOfParticipants.toString()} 
@@ -319,29 +356,51 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </div> */}
 
       {participants.map((participant, index) => (
         <div key={participant.id} className="pt-4 pb-2 border-t">
           <h3 className="font-medium mb-4">
-            {index === 0 ? 'Your Details' : `Participant ${index + 1} Details`}
+            {index === 0 ? "Your Details" : `Participant ${index + 1} Details`}
           </h3>
           <div className="space-y-4">
-            {fields.map(field => (
-              <div key={`${participant.id}-${field.name}`} className="space-y-2">
-                <Label>
-                  {field.name}
-                  {field.required && ' *'}
-                </Label>
-                <Input
-                  type={field.type}
-                  value={participant.data[field.name] || ''}
-                  onChange={(e) => handleFieldChange(participant.id, field.name, e.target.value)}
-                  required={field.required}
-                  placeholder={`Enter ${field.name.toLowerCase()}`}
-                />
-              </div>
-            ))}
+            {Object.values(fields || {}).map((field) => {
+              console.log(field);
+
+              const isUniqueCode = field.name.toLowerCase() === "unique code";
+              console.log(isUniqueCode);
+
+              return (
+                <div
+                  key={`${participant.id}-${field.name}`}
+                  className="space-y-2"
+                >
+                  {!isUniqueCode && (
+                    <>
+                      <Label>
+                        {field.name}
+                        {field.required && " *"}
+                      </Label>
+                      <Input
+                        type={field.type}
+                        value={participant.data?.[field.name] || ""}
+                        onChange={(e) =>
+                          !isUniqueCode &&
+                          handleFieldChange(
+                            participant.id,
+                            field.name,
+                            e.target.value
+                          )
+                        }
+                        required={field.required}
+                        readOnly={isUniqueCode}
+                        placeholder={`Enter ${field.name.toLowerCase()}`}
+                      />
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       ))}
@@ -356,28 +415,36 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
           <AlertDescription>{paymentError}</AlertDescription>
         </Alert>
       )}
-      
+
       <h3 className="font-medium mb-4">Payment Method</h3>
       <div className="grid grid-cols-1 gap-3">
         <div
           className={`border rounded-md p-4 cursor-pointer transition-colors ${
-            paymentMethod === 'Paystack' ? 'border-kolekto bg-kolekto/5' : 'hover:border-gray-300'
+            paymentMethod === "Paystack"
+              ? "border-kolekto bg-kolekto/5"
+              : "hover:border-gray-300"
           }`}
-          onClick={() => setPaymentMethod('Paystack')}
+          onClick={() => setPaymentMethod("Paystack")}
         >
           <div className="flex items-center">
             <div
               className={`w-4 h-4 rounded-full border ${
-                paymentMethod === 'Paystack' ? 'border-kolekto bg-kolekto' : 'border-gray-300'
+                paymentMethod === "Paystack"
+                  ? "border-kolekto bg-kolekto"
+                  : "border-gray-300"
               }`}
             >
-              {paymentMethod === 'Paystack' && <Check className="h-3 w-3 text-white" />}
+              {paymentMethod === "Paystack" && (
+                <Check className="h-3 w-3 text-white" />
+              )}
             </div>
-            <span className="ml-2 font-medium">Paystack (Cards, Bank Transfer, USSD)</span>
+            <span className="ml-2 font-medium">
+              Paystack (Cards, Bank Transfer, USSD)
+            </span>
           </div>
         </div>
       </div>
-      
+
       <div className="mt-4 text-sm text-gray-600">
         <p>Secure payment processing powered by Paystack</p>
       </div>
@@ -386,16 +453,20 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
 
   const getStepContent = () => {
     switch (step) {
-      case 'contact': return renderContactForm();
-      case 'details': return renderParticipantForm();
-      case 'payment': return renderPaymentForm();
-      default: return null;
+      case "contact":
+        return renderContactForm();
+      case "details":
+        return renderParticipantForm();
+      case "payment":
+        return renderPaymentForm();
+      default:
+        return null;
     }
   };
 
   const getStepActions = () => {
     switch (step) {
-      case 'contact':
+      case "contact":
         return (
           <Button
             type="button"
@@ -406,10 +477,15 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         );
-      case 'details':
+      case "details":
         return (
           <div className="flex gap-2 w-full">
-            <Button type="button" onClick={previousStep} variant="outline" className="flex-1">
+            <Button
+              type="button"
+              onClick={previousStep}
+              variant="outline"
+              className="flex-1"
+            >
               Back
             </Button>
             <Button
@@ -422,7 +498,7 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
             </Button>
           </div>
         );
-      case 'payment':
+      case "payment":
         return (
           <div className="flex flex-col gap-2 w-full">
             <Button
@@ -431,7 +507,7 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
               className="w-full bg-kolekto hover:bg-kolekto/90"
               disabled={isLoading || paymentLoading}
             >
-              {(isLoading || paymentLoading) ? (
+              {isLoading || paymentLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Processing...
@@ -462,7 +538,9 @@ const ContributionForm: React.FC<ContributionFormProps> = ({
           <CardTitle>{collectionTitle}</CardTitle>
           <CardDescription>
             {description && <div className="mt-2">{description}</div>}
-            <div className="mt-2">Amount per person: ₦{amount.toLocaleString()}</div>
+            <div className="mt-2">
+              Amount per person: ₦{amount.toLocaleString()}
+            </div>
           </CardDescription>
         </CardHeader>
         <CardContent>{getStepContent()}</CardContent>

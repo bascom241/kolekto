@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/store/useAuthStore';
 
 interface UserProfile {
   full_name: string;
@@ -11,32 +12,20 @@ interface UserProfile {
 }
 
 const UserProfilePage: React.FC = () => {
-  const { user } = useAuth();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const { authUser } = useAuthStore();
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+useEffect(()=>{
+  if (authUser) {setLoading(false);}
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      if (!user) return;
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('full_name,email,phone_number')
-        .eq('id', user.id)
-        .maybeSingle();
-      if (!error && data) {
-        setProfile(data);
-      }
-      setLoading(false);
-    };
-    fetchProfile();
-  }, [user]);
+},[authUser]);
 
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Profile</h1>
       {loading ? (
         <div className="text-center text-muted-foreground py-10">Loading profile...</div>
-      ) : profile ? (
+      ) : authUser ? (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-medium">Personal Information</CardTitle>
@@ -45,15 +34,15 @@ const UserProfilePage: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <h3 className="font-medium">Name</h3>
-                <p className="text-gray-600">{profile.full_name}</p>
+                <p className="text-gray-600">{authUser.fullName}</p>
               </div>
               <div>
                 <h3 className="font-medium">Email</h3>
-                <p className="text-gray-600">{profile.email}</p>
+                <p className="text-gray-600">{authUser.email}</p>
               </div>
               <div>
                 <h3 className="font-medium">Phone</h3>
-                <p className="text-gray-600">{profile.phone_number || 'Not provided'}</p>
+                <p className="text-gray-600">{authUser.phoneNumber || 'Not provided'}</p>
               </div>
             </div>
           </CardContent>

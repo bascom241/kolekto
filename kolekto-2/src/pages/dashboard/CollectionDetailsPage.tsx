@@ -1,13 +1,29 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import QRCodeDisplay from "@/components/collections/QRCodeDisplay";
 import { useAuth } from "@/context/AuthContext";
 import {
-  BarChart, Calendar, Download, Eye, Share, Wallet,
-  Users, Clock, AlertCircle, CheckCircle, TimerOff, Loader2,
+  BarChart,
+  Calendar,
+  Download,
+  Eye,
+  Share,
+  Wallet,
+  Users,
+  Clock,
+  AlertCircle,
+  CheckCircle,
+  TimerOff,
+  Loader2,
 } from "lucide-react";
 import { WithdrawFundsDialog } from "@/components/withdrawals/WithdrawFundsDialog";
 import { toast } from "sonner";
@@ -45,6 +61,7 @@ interface Contributor {
   contributor_name: string;
   contributor_email: string;
   contributor_phone?: string;
+  participant_information?: [];
   created_at: string;
   amount: number;
   status: "paid" | "pending" | "failed";
@@ -96,6 +113,7 @@ const CollectionDetailsPage: React.FC = () => {
       toast.error("Failed to load contributors. Please try again later.");
     }
   }, [collectionError, contributorsError]);
+  console.log(contributors);
 
   const shareUrl = `${window.location.origin}/contribute/${id}`;
 
@@ -121,7 +139,9 @@ const CollectionDetailsPage: React.FC = () => {
     let csvContent = headers.join(",") + "\n";
 
     contributors.forEach((contributor) => {
-      const formattedDate = new Date(contributor.created_at).toLocaleDateString("en-NG");
+      const formattedDate = new Date(contributor.created_at).toLocaleDateString(
+        "en-NG"
+      );
       const row = [
         contributor.contributor_name,
         contributor.contributor_email,
@@ -137,7 +157,10 @@ const CollectionDetailsPage: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `${collection?.title || "collection"}-contributors.csv`);
+    link.setAttribute(
+      "download",
+      `${collection?.title || "collection"}-contributors.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -171,8 +194,12 @@ const CollectionDetailsPage: React.FC = () => {
     });
 
     setIsWithdrawDialogOpen(false);
-    toast.success("Withdrawal request simulated. In a real app, this would be processed.");
+    toast.success(
+      "Withdrawal request simulated. In a real app, this would be processed."
+    );
   };
+
+  console.log(collection, "collection");
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -207,16 +234,26 @@ const CollectionDetailsPage: React.FC = () => {
   const filteredContributors = contributors
     .filter(
       (contributor) =>
-        contributor.contributor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        contributor.contributor_email?.toLowerCase().includes(searchTerm.toLowerCase())
+        contributor.contributor_name
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        contributor.contributor_email
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase())
     )
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    .sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
 
-  const contributionsByDate = contributors.reduce((acc: Record<string, number>, curr) => {
-    const date = new Date(curr.created_at).toLocaleDateString("en-NG");
-    acc[date] = (acc[date] || 0) + (curr.amount || 0);
-    return acc;
-  }, {});
+  const contributionsByDate = contributors.reduce(
+    (acc: Record<string, number>, curr) => {
+      const date = new Date(curr.created_at).toLocaleDateString("en-NG");
+      acc[date] = (acc[date] || 0) + (curr.amount || 0);
+      return acc;
+    },
+    {}
+  );
 
   const chartData = Object.keys(contributionsByDate).map((date) => ({
     date,
@@ -224,12 +261,17 @@ const CollectionDetailsPage: React.FC = () => {
   }));
 
   const totalCollected = contributors.reduce((sum, contributor) => {
-    return contributor.status === "paid" ? sum + (contributor.amount || 0) : sum;
+    return contributor.status === "paid"
+      ? sum + (contributor.amount || 0)
+      : sum;
   }, 0);
 
-  const contributorsCount = contributors.filter((c) => c.status === "paid").length;
+  const contributorsCount = contributors.filter(
+    (c) => c.status === "paid"
+  ).length;
   const withdrawableAmount = totalCollected * 0.9; // Assuming 10% platform fee
 
+  console.log(filteredContributors, "filteredContributors");
   if (collectionLoading || isContributorsLoading) {
     return (
       <div className="py-10 text-center text-gray-500">
@@ -241,12 +283,17 @@ const CollectionDetailsPage: React.FC = () => {
     );
   }
 
+  console.log(filteredContributors, "filteredContributors");
+
   if (!collection) {
     return (
       <div className="py-10 text-center">
-        <h2 className="text-2xl font-bold text-gray-700 mb-4">Collection Not Found</h2>
+        <h2 className="text-2xl font-bold text-gray-700 mb-4">
+          Collection Not Found
+        </h2>
         <p className="text-gray-600 mb-6">
-          The collection you're looking for doesn't exist or you may not have permission to view it.
+          The collection you're looking for doesn't exist or you may not have
+          permission to view it.
         </p>
         <Button
           onClick={() => navigate("/dashboard/collections")}
@@ -261,7 +308,9 @@ const CollectionDetailsPage: React.FC = () => {
   if (contributorsError) {
     return (
       <div className="py-10 text-center text-gray-500">
-        <h2 className="text-2xl font-bold text-gray-700 mb-4">Error Loading Contributors</h2>
+        <h2 className="text-2xl font-bold text-gray-700 mb-4">
+          Error Loading Contributors
+        </h2>
         <p className="text-gray-600 mb-6">
           Failed to load contributor data. Please try again or contact support.
         </p>
@@ -346,20 +395,30 @@ const CollectionDetailsPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Collection Amount</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Collection Amount
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">₦{collection.amount.toLocaleString()}</div>
+                <div className="text-2xl font-bold">
+                  ₦{collection.amount.toLocaleString()}
+                </div>
                 <p className="text-sm text-gray-500">Per participant</p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Total Collected</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Total Collected
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">₦{totalCollected.toLocaleString()}</div>
-                <p className="text-sm text-gray-500">From {contributorsCount} contributors</p>
+                <div className="text-2xl font-bold">
+                  ₦{totalCollected.toLocaleString()}
+                </div>
+                <p className="text-sm text-gray-500">
+                  From {contributorsCount} contributors
+                </p>
               </CardContent>
             </Card>
             <Card>
@@ -369,17 +428,22 @@ const CollectionDetailsPage: React.FC = () => {
               <CardContent>
                 <div className="text-2xl font-bold">
                   {collection.deadline
-                    ? new Date(collection.deadline).toLocaleDateString("en-NG", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })
+                    ? new Date(collection.deadline).toLocaleDateString(
+                        "en-NG",
+                        {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        }
+                      )
                     : "No deadline set"}
                 </div>
                 <p className="text-sm text-gray-500">
-                  {collection.deadline && new Date(collection.deadline) > new Date()
+                  {collection.deadline &&
+                  new Date(collection.deadline) > new Date()
                     ? `${Math.ceil(
-                        (new Date(collection.deadline).getTime() - new Date().getTime()) /
+                        (new Date(collection.deadline).getTime() -
+                          new Date().getTime()) /
                           (1000 * 60 * 60 * 24)
                       )} days left`
                     : collection.deadline
@@ -394,7 +458,9 @@ const CollectionDetailsPage: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Collection Information</CardTitle>
-                <CardDescription>Details about this collection and how to participate</CardDescription>
+                <CardDescription>
+                  Details about this collection and how to participate
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -404,7 +470,9 @@ const CollectionDetailsPage: React.FC = () => {
                       <div className="flex justify-between border-b pb-2">
                         <span className="text-gray-600">Created On</span>
                         <span className="font-medium">
-                          {new Date(collection.created_at).toLocaleDateString("en-NG")}
+                          {new Date(collection.created_at).toLocaleDateString(
+                            "en-NG"
+                          )}
                         </span>
                       </div>
                       <div className="flex justify-between border-b pb-2">
@@ -420,16 +488,24 @@ const CollectionDetailsPage: React.FC = () => {
                       </div>
                       {collection.max_participants && (
                         <div className="flex justify-between border-b pb-2">
-                          <span className="text-gray-600">Max Participants</span>
-                          <span className="font-medium">{collection.max_participants}</span>
+                          <span className="text-gray-600">
+                            Max Participants
+                          </span>
+                          <span className="font-medium">
+                            {collection.max_participants}
+                          </span>
                         </div>
                       )}
                       <div className="flex justify-between border-b pb-2">
-                        <span className="text-gray-600">Current Contributors</span>
+                        <span className="text-gray-600">
+                          Current Contributors
+                        </span>
                         <span className="font-medium">{contributorsCount}</span>
                       </div>
                       <div className="flex justify-between pb-2">
-                        <span className="text-gray-600">Unique Payment Link</span>
+                        <span className="text-gray-600">
+                          Unique Payment Link
+                        </span>
                         <a
                           href={shareUrl}
                           target="_blank"
@@ -486,7 +562,9 @@ const CollectionDetailsPage: React.FC = () => {
         <TabsContent value="contributors" className="mt-6">
           <Card>
             <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <CardTitle>Contributors & Input Data ({contributors.length})</CardTitle>
+              <CardTitle>
+                Contributors & Input Data ({contributors.length})
+              </CardTitle>
               <div className="flex gap-2 w-full sm:w-auto">
                 <input
                   type="text"
@@ -511,53 +589,100 @@ const CollectionDetailsPage: React.FC = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead className="hidden sm:table-cell">Email</TableHead>
-                      <TableHead className="hidden md:table-cell">Amount</TableHead>
-                      <TableHead className="hidden md:table-cell">Date</TableHead>
-                      <TableHead className="hidden lg:table-cell">Phone</TableHead>
-                      <TableHead className="hidden lg:table-cell">Status</TableHead>
+                      {Object.values(collection.participant_information).map(
+                        (field, i) => {
+                          console.log(field, "field");
+
+                          return (
+                            <TableHead
+                              key={field.name}
+                              className="hidden sm:table-cell"
+                            >
+                              {field.name}
+                            </TableHead>
+                          );
+                        }
+                      )}
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {filteredContributors.map((contributor) => {
+                      return (
+                        <TableRow key={contributor.id}>
+                          {Object.values(
+                            collection.participant_information
+                          ).map((field) => {
+                            const fieldName = field.name;
+                            const participantData =
+                              contributor.participantInformation?.[0] || {};
+                            console.log(participantData, "field name");
+
+                            return (
+                              <TableCell
+                                key={fieldName}
+                                className="hidden sm:table-cell"
+                              >
+                                {participantData[fieldName] || "N/A"}
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                  {/* <TableHeader>
+                    <TableRow>
+                      {collection.participant_information.map((field)=><TableHead className="hidden sm:table-cell">{field.name}</TableHead>)}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredContributors.map((contributor) => (
-                      <TableRow key={contributor.id}>
-                        <TableCell className="font-medium">{contributor.contributor_name}</TableCell>
-                        <TableCell className="hidden sm:table-cell">{contributor.contributor_email}</TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          ₦{contributor.amount?.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {new Date(contributor.created_at).toLocaleDateString("en-NG")}
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell">
-                          {contributor.contributor_phone || "N/A"}
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-xs ${
-                              contributor.status === "paid"
-                                ? "bg-green-100 text-green-800"
-                                : contributor.status === "pending"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-red-100 text-red-800"
-                            }`}
-                          >
-                            {contributor.status}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
+                    {filteredContributors.map((contributor) => {
+                      console.log(contributor, contributor.participantInformation);
+
+                      return (
+                        <TableRow key={contributor.id}>
+                          <TableCell className="font-medium">{contributor?.participantInformation?.Level }level</TableCell>
+                          <TableCell className="hidden sm:table-cell">{contributor.contributor_email}</TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            ₦{contributor.amount?.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            {new Date(contributor.created_at).toLocaleDateString("en-NG")}
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            {contributor.contributor_phone || "N/A"}
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-xs ${
+                                contributor.status === "paid"
+                                  ? "bg-green-100 text-green-800"
+                                  : contributor.status === "pending"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              {contributor.status}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    }
+                    )}
+                  </TableBody> */}
                 </Table>
-                
               ) : (
                 <div className="py-8 text-center text-gray-500">
-                  {searchTerm ? "No contributors match your search" : "No contributors yet"}
+                  {searchTerm
+                    ? "No contributors match your search"
+                    : "No contributors yet"}
                 </div>
               )}
               <div className="block sm:hidden mt-4">
-                <p className="text-xs text-gray-500">Swipe to see full contributor details</p>
+                <p className="text-xs text-gray-500">
+                  Swipe to see full contributor details
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -568,8 +693,12 @@ const CollectionDetailsPage: React.FC = () => {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Contribution Activity</CardTitle>
               <div className="text-right">
-                <div className="text-sm text-gray-500">Available for withdrawal</div>
-                <div className="font-bold text-lg">₦{withdrawableAmount.toLocaleString()}</div>
+                <div className="text-sm text-gray-500">
+                  Available for withdrawal
+                </div>
+                <div className="font-bold text-lg">
+                  ₦{withdrawableAmount.toLocaleString()}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -616,12 +745,18 @@ const CollectionDetailsPage: React.FC = () => {
                       className="flex justify-between items-center border-b pb-2"
                     >
                       <div>
-                        <div className="font-medium">{contributor.contributor_name}</div>
+                        <div className="font-medium">
+                          {contributor.contributor_name}
+                        </div>
                         <div className="text-sm text-gray-500">
-                          {new Date(contributor.created_at).toLocaleDateString("en-NG")}
+                          {new Date(contributor.created_at).toLocaleDateString(
+                            "en-NG"
+                          )}
                         </div>
                       </div>
-                      <div className="font-bold">₦{contributor.amount?.toLocaleString()}</div>
+                      <div className="font-bold">
+                        ₦{contributor.amount?.toLocaleString()}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -665,13 +800,15 @@ const CollectionDetailsPage: React.FC = () => {
             <Button
               onClick={() => {
                 if (navigator.share) {
-                  navigator.share({
-                    title: `Contribute to ${collection.title}`,
-                    text: `Join me in contributing to ${collection.title}`,
-                    url: shareUrl,
-                  }).catch((err) => {
-                    console.error("Error sharing:", err);
-                  });
+                  navigator
+                    .share({
+                      title: `Contribute to ${collection.title}`,
+                      text: `Join me in contributing to ${collection.title}`,
+                      url: shareUrl,
+                    })
+                    .catch((err) => {
+                      console.error("Error sharing:", err);
+                    });
                 } else {
                   navigator.clipboard.writeText(shareUrl);
                   toast.success("Link copied to clipboard!");

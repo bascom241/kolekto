@@ -11,6 +11,7 @@ interface Collection {
   deadline: string | null;
   status: "active" | "expired" | "completed";
   participants_count: number;
+  participant_information: [];
   max_participants?: number;
   created_at: string;
 }
@@ -20,6 +21,7 @@ interface Contributor {
   contributor_name: string;
   contributor_email: string;
   contributor_phone?: string;
+  participantInformation: [];
   created_at: string;
   amount: number;
   status: "paid" | "pending" | "failed";
@@ -54,12 +56,14 @@ export const useCollectionStore = create<CollectionState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const { data } = await axiosInstance.get("/collections");
-      set({ 
+
+      set({
         collections: data.collections,
-        isLoading: false 
+        isLoading: false,
       });
     } catch (error: any) {
-      const message = error.response?.data?.message || "Failed to fetch collections";
+      const message =
+        error.response?.data?.message || "Failed to fetch collections";
       set({ error: message, isLoading: false });
       toast.error(message);
     }
@@ -69,12 +73,14 @@ export const useCollectionStore = create<CollectionState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const { data } = await axiosInstance.get(`/collections/collection/${id}`);
-      set({ 
+      console.log("Fetched collection data:", data);
+      set({
         selectedCollection: data.collection,
-        isLoading: false 
+        isLoading: false,
       });
     } catch (error: any) {
-      const message = error.response?.data?.message || "Failed to fetch collection";
+      const message =
+        error.response?.data?.message || "Failed to fetch collection";
       set({ error: message, isLoading: false, selectedCollection: null });
       toast.error(message);
     }
@@ -83,17 +89,20 @@ export const useCollectionStore = create<CollectionState>((set) => ({
   fetchContributors: async (collectionId: string) => {
     set({ isContributorsLoading: true, contributorsError: null });
     try {
-      const { data } = await axiosInstance.get(`/collections/${collectionId}/contributors`);
+      const { data } = await axiosInstance.get(
+        `/collections/${collectionId}/contributors`
+      );
       set({
         contributors: data.contributors,
-        isContributorsLoading: false
+        isContributorsLoading: false,
       });
     } catch (error: any) {
-      const message = error.response?.data?.message || "Failed to fetch contributors";
-      set({ 
-        contributorsError: message, 
+      const message =
+        error.response?.data?.message || "Failed to fetch contributors";
+      set({
+        contributorsError: message,
         isContributorsLoading: false,
-        contributors: [] 
+        contributors: [],
       });
       toast.error(message);
     }
@@ -102,14 +111,18 @@ export const useCollectionStore = create<CollectionState>((set) => ({
   createCollection: async (formData, navigate) => {
     set({ isCreating: true }); // Changed from isLoading to isCreating
     try {
-      const { data } = await axiosInstance.post("/collections/create", formData);
+      const { data } = await axiosInstance.post(
+        "/collections/create",
+        formData
+      );
       toast.success(data.message);
       navigate("/dashboard/collections");
       set({ isCreating: false });
     } catch (error: any) {
-      const message = error.response?.data?.message || "Failed to create collection";
+      const message =
+        error.response?.data?.message || "Failed to create collection";
       set({ error: message, isCreating: false });
       toast.error(message);
     }
-  }
+  },
 }));

@@ -66,7 +66,7 @@ const DashboardPage = () => {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Your Collections</CardTitle>
           <Button asChild>
-            <Link to="/create-collection">
+            <Link to="/dashboard/create-collection">
               <Plus className="mr-2 h-4 w-4" /> New Collection
             </Link>
           </Button>
@@ -82,7 +82,7 @@ const DashboardPage = () => {
                 <div 
                   key={collection.id} 
                   className="border rounded-lg p-4 hover:bg-muted/50 cursor-pointer"
-                  onClick={() => navigate(`/collections/${collection.id}`)}
+                  onClick={() => navigate(`/dashboard/collections/${collection.id}`)}
                 >
                   <div className="flex justify-between items-center">
                     <div>
@@ -108,7 +108,7 @@ const DashboardPage = () => {
             <div className="text-center py-10 text-muted-foreground">
               <p className="mb-4">You don't have any collections yet</p>
               <Button asChild>
-                <Link to="/create-collection">
+                <Link to="/dashboard/create-collection">
                   <Plus className="mr-2 h-4 w-4" /> Create your first collection
                 </Link>
               </Button>

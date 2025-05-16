@@ -3,11 +3,14 @@ import ContributionForm from './ContributionForm';
 import PaymentSuccessful from './PaymentSuccessful';
 import PaymentErrorHandler from './PaymentErrorHandler';
 import { toast } from 'sonner';
+import { format } from 'path';
+import { log } from 'console';
 
 interface Field {
   name: string;
   type: string;
   required: boolean;
+  value?: string;
 }
 
 interface ContributionWrapperProps {
@@ -48,6 +51,7 @@ const ContributionWrapper: React.FC<ContributionWrapperProps> = ({
         uniqueCode: `${formData.collectionId}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
       };
     });
+    console.log(formattedParticipants, 'formattedParticipants');
     
     setParticipantDetails(formattedParticipants);
     setAmountPaid(formData.totalAmount);
@@ -66,6 +70,8 @@ const ContributionWrapper: React.FC<ContributionWrapperProps> = ({
   const handleRetry = () => {
     setError(null);
   };
+  console.log(fields, 'fields');
+  
   
   return (
     <>

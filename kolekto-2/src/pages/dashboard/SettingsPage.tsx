@@ -17,6 +17,7 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table';
+import { useCollectionStore } from '@/store/useCollectionStore';
 
 const TransactionHistoryPage: React.FC = () => {
   const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
@@ -28,15 +29,19 @@ const TransactionHistoryPage: React.FC = () => {
     useFinancialSummary 
   } = useTransactions();
   
-  const { data: collections, isLoading: collectionsLoading } = useCollectionsList(user?.id);
+  // const { data: collections, isLoading: collectionsLoading } = useCollectionsList(user?.id);
   const { data: financialSummary, isLoading: summaryLoading } = useFinancialSummary(user?.id);
   const { 
     data: transactionsData, 
     isLoading: transactionsLoading 
   } = useTransactionsList(user?.id, undefined, 1, 10);
   
-  const transactions = transactionsData?.data || [];
+    const { collections, isLoading:collectionsLoading, error, fetchCollections } = useCollectionStore();
   
+
+  const transactions = transactionsData?.data || [];
+  console.log(collections, 'collection');
+
   // Calculate withdrawable amount and platform fee tier for each collection
   const collectionEarnings = collections?.map(collection => {
     const totalCollected = collection.total_amount || 0;

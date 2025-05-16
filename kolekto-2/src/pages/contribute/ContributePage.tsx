@@ -44,13 +44,7 @@ const ContributePage: React.FC = () => {
     }
   }, [collection, isLoading]);
 
-  // Default fields for all collections
-  const defaultFields = [
-    { name: 'Full Name', type: 'text', required: true },
-    { name: 'Email', type: 'email', required: true },
-    { name: 'Phone Number', type: 'tel', required: false },
-  ];
-
+  
   // If still loading
   if (isLoading) {
     return (
@@ -94,7 +88,7 @@ const ContributePage: React.FC = () => {
             collectionId={collection.id}
             collectionTitle={collection.title}
             amount={collection.amount}
-            fields={defaultFields}
+            fields={collection.participant_information}
             description={collection.description}
             deadline={collection.deadline}
           />

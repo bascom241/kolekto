@@ -53,6 +53,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoggedIn: true });
     try {
       const response = await axiosInstance.post('/users/login', formData);
+      console.log(response.data, 'USER DATA');
+      
       set({ isLoggedIn: false, authUser: response.data.user });
       toast.success(response.data.message);
       navigate('/dashboard');

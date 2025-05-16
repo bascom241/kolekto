@@ -12,6 +12,7 @@ const CollectionsPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { collections, isLoading, error, fetchCollections } = useCollectionStore();
+console.log(collections, 'collection');
 
   React.useEffect(() => {
     fetchCollections();
