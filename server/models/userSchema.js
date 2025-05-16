@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema({
         unique:true,
         validate:{
             validator:function(v){
-                return validator.isEmail(v)
+                return validator.isEmail()
             },
             message:(props) => `${props.value} is not a valid email!`
         }

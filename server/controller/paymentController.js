@@ -41,7 +41,7 @@ const initializePayment = async (req, res) => {
           "Content-Type": "application/json",
         },
       }
-    );
+    );    
 
     const payment = new Payment({
       fullName,

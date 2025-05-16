@@ -15,6 +15,7 @@ const createCollection = async (req, res) => {
       generateUniqueCodes,
       codePrefix,
     } = req.body;
+console.log(participantInformation);
 
     const requiredFields = ['title', 'amount', 'amountBreakdown', 'numberOfParticipants'];
     const missingFields = requiredFields.filter((field) => !req.body[field]);
@@ -117,7 +118,7 @@ const getCollections = async (req, res) => {
 
         return {
           id: collection._id.toString(),
-          title: collection.title,
+          title: collection.collectionTitle,
           description: collection.description,
           amount: collection.amount,
           deadline: collection.deadline ? new Date(collection.deadline).toISOString() : null,

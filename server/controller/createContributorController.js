@@ -2,16 +2,22 @@ import Contributor from "../models/contributorSchema.js";
 import RegisterCollection from "../models/registerCollectionSchema.js";
 
 const createContributor = async (req, res) => {
+
+console.log("Creating contributor...");
+  console.log("Request body:", req.body);
+
   try {
-    const { name, email, phoneNumber, amount, collectionId } = req.body;
+    const { name, email, phoneNumber, amount, collectionId, participantInformation } = req.body;
+console.log(req.body);
 
     // Validate input
-    if (!name || !email || !phoneNumber || !amount || !collectionId) {
+    if (!name || !email || !phoneNumber || !amount || !collectionId || !participantInformation) {
       return res.status(400).json({ 
         success: false,
         message: "All fields are required" 
       });
     }
+console.log(participantInformation);
 
     // Check if collection exists
     const collection = await RegisterCollection.findById(collectionId);
@@ -28,6 +34,7 @@ const createContributor = async (req, res) => {
       email,
       phoneNumber,
       amount,
+      participantInformation: [...participantInformation],
       collection: collectionId,
       status: "pending"
     });
@@ -40,7 +47,8 @@ const createContributor = async (req, res) => {
       contributor: {
         id: contributor._id.toString(), 
         name: contributor.name,
-        email: contributor.email
+        email: contributor.email,
+        participantInformation: contributor.participantInformation,
       }
     };
 
@@ -48,6 +56,8 @@ const createContributor = async (req, res) => {
     res.status(201).json(responseData);
 
   } catch (error) {
+    console.log("Error creating contributor:", error);
+    
     console.error("Error creating contributor:", error);
     res.status(500).json({ 
       success: false,

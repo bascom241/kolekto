@@ -50,7 +50,7 @@ const registerCollectionSchema = new mongoose.Schema({
     type: Number,
     min: 1,
   },
-  participantInformation: [formFieldSchema],
+  participantInformation: {type: Array},
   code: {
     type: String,
     unique: true,
